@@ -8,7 +8,7 @@ fibheaptest.o: fibheap.h fibheaptest.c
 	$(CC) $(CFLAGS) -c fibheaptest.c
 
 fibheaptest: fibheaptest.o fibheap.o
-	$(CC) $(CFLAGS) fibheaptest.o fibheap.o -o fibheaptest
+	$(CC) $(CFLAGS) fibheaptest.o fibheap.o -o fibheaptest -lm
 
 clean:
 	rm -f *.o
