@@ -17,8 +17,15 @@ int main() {
         fibheap_insert(&fibheap, node);
     }
     
-    printf("Fibheap List :\n");
-    dllist_print(fibheap.rootList);
-    //printf("min: %d\n", fibheap_extract_min(&fibheap)->key);
+    fibheap_print(&fibheap);
+    printf("Decrease key 9 to 1.\n");
+    fibheap_decreaseKey(&fibheap, node, 1);
+    fibheap_print(&fibheap);
+
+    for (int i = 0; i < n; i++) {
+        node_t *min = fibheap_extract_min(&fibheap);
+        printf("Extract min: %d\n", min->key);
+        fibheap_print(&fibheap);
+    }
     return 0;
 }
