@@ -6,6 +6,7 @@
 #include <math.h>
 
 typedef struct node_t {
+    void *owner;
     struct node_t* parent;
     struct node_t* child;
     struct node_t* next;
@@ -26,6 +27,12 @@ void node_init(node_t *node);
 /* Initializes a Fibonacci heap */
 void fibheap_init(fibheap_t *fibheap);
 
+/* Destroys a Fibonacci heap by freeing all the contained nodes */
+void fibheap_destroy(fibheap_t *fibheap);
+
+/* Checks whether a fibheap is empty. A return value of 1 means empty, a value of 0 means not. */
+int fibheap_empty(fibheap_t *fibheap);
+
 /* Inserts a node into a Fibonacci heap */
 void fibheap_insert(fibheap_t *fibheap, node_t *node);
 
@@ -38,4 +45,4 @@ void fibheap_decreaseKey(fibheap_t *fibheap, node_t *node, int k);
 /* Prints the keys of all the nodes in a list */
 void fibheap_print(fibheap_t *fibheap);
 
-#endif
+#endif /* FIBHEAP_H */

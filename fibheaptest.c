@@ -22,9 +22,13 @@ int main() {
     fibheap_decreaseKey(&fibheap, node, 1);
     fibheap_print(&fibheap);
 
+    //fibheap_destroy(&fibheap);
+
     for (int i = 0; i < n; i++) {
         node_t *min = fibheap_extract_min(&fibheap);
-        printf("Extract min: %d\n", min->key);
+        if (min != NULL) {
+            printf("Extract min: %d\n", min->key);
+        }
         fibheap_print(&fibheap);
     }
     return 0;

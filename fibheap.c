@@ -1,6 +1,7 @@
 #include "fibheap.h"
 
 void node_init(node_t *node) {
+    node->owner = NULL;
     node->parent = NULL;
     node->child = NULL;
     node->next = NULL;
@@ -13,6 +14,21 @@ void node_init(node_t *node) {
 void fibheap_init(fibheap_t *fibheap) {
     fibheap->min = NULL;
     fibheap->n = 0;
+}
+
+void fibheap_destroy(fibheap_t *fibheap) {
+    node_t *node;
+    while ((node = fibheap_extract_min(fibheap)) != NULL) {
+        free(node);
+    }
+}
+
+int fibheap_empty(fibheap_t *fibheap) {
+    if (fibheap->min == NULL) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 void dllist_insert(node_t *node, node_t *newNode) {
@@ -87,9 +103,9 @@ void fibheap_insert(fibheap_t *fibheap, node_t *node) {
 }
 
 void fibheap_consolidate(fibheap_t *fibheap) {
-    printf("Consolidate\n");
+    //printf("Consolidate\n");
     int n = ceil(log(fibheap->n)) + 1;
-    printf("D(n) = %d\n", n - 1);
+    //printf("D(n) = %d\n", n - 1);
     node_t *A[n];
     for (int i = 0; i < n; i++) {
         A[i] = NULL;
@@ -100,18 +116,17 @@ void fibheap_consolidate(fibheap_t *fibheap) {
     node_t *end = x->prev;
     node_t *y;
     node_t *temp;
-    do {
-        printf("Consolidate Do\n");
-        printf("Node %d\n", x->key);
-        printf("Next %d\n", x->next->key);
-        printf("Start %d\n", start->key);
+    while (1) {
+        //printf("Consolidate Do\n");
+        //printf("Node %d\n", x->key);
+        //printf("Next %d\n", x->next->key);
         while (A[x->degree] != NULL) {
             if (x->degree >= n) {
                 printf("Error: Node degree %d exceeds D(n) = %d!\n", x->degree, n - 1);
                 exit(EXIT_FAILURE);
             }
-            printf("Consolidate While\n");
-            printf("x.degree = %d\n", x->degree);
+            //printf("Consolidate While\n");
+            //printf("x.degree = %d\n", x->degree);
             y = A[x->degree];
             if (x->key > y->key) {
                 temp = x;
@@ -130,9 +145,13 @@ void fibheap_consolidate(fibheap_t *fibheap) {
             x->degree++;
         }
         A[x->degree] = x;
+
+        if (x == end) {
+            break;
+        }
         x = next;
         next = x->next;
-    } while (x != end);
+    }
     fibheap->min = NULL;
 
     for (int i = 0; i < n; i++) {
@@ -151,7 +170,7 @@ void fibheap_consolidate(fibheap_t *fibheap) {
 }
 
 node_t *fibheap_extract_min(fibheap_t *fibheap) {
-    printf("Extract min\n");
+    //printf("Extract min\n");
     node_t *z = fibheap->min;
     if (z != NULL) {
         if (z->child != NULL) {
