@@ -40,7 +40,7 @@ void fibheap_insert(fibheap_t *fibheap, node_t *node);
 node_t *fibheap_extract_min(fibheap_t *fibheap);
 
 /* Decreases the key of a node in a Fibonacci heap */
-void fibheap_decreaseKey(fibheap_t *fibheap, node_t *node, int k);
+void fibheap_decrease_key(fibheap_t *fibheap, node_t *node, int k);
 
 /* Prints the keys of all the nodes in a list */
 void fibheap_print(fibheap_t *fibheap);

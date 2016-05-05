@@ -1,4 +1,5 @@
 #include "fibheap.h"
+#include <math.h>
 
 void node_init(node_t *node) {
     node->owner = NULL;
@@ -6,7 +7,7 @@ void node_init(node_t *node) {
     node->child = NULL;
     node->next = NULL;
     node->prev = NULL;
-    node->key = 0;
+    node->key = INFINITY;
     node->degree = 0;
     node->mark = 0;
 }
@@ -87,7 +88,7 @@ void dllist_create(node_t *node) {
 
 void fibheap_insert(fibheap_t *fibheap, node_t *node) {
     if (node == NULL) {
-        printf("Error: Node is not initialized!\n");
+        printf("Error (fibheap_insert: Node is not initialized!\n");
         exit(EXIT_FAILURE);
     }
     if (fibheap->min == NULL) {
@@ -110,7 +111,7 @@ void fibheap_consolidate(fibheap_t *fibheap) {
     for (int i = 0; i < n; i++) {
         A[i] = NULL;
     }
-    
+
     node_t *x = fibheap->min;
     node_t *next = x->next;
     node_t *end = x->prev;
@@ -218,7 +219,7 @@ void fibheap_cascadingCut(fibheap_t *fibheap, node_t *node) {
     }
 }
 
-void fibheap_decreaseKey(fibheap_t *fibheap, node_t *node, int k) {
+void fibheap_decrease_key(fibheap_t *fibheap, node_t *node, int k) {
     if (k > node->key) {
         printf("Error: New key is greater than current key!\n");
         exit(EXIT_FAILURE);

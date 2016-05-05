@@ -1,47 +1,45 @@
-CC=gcc
-CFLAGS=-g -pedantic -std=c99 -Wall -Wextra -Werror
+# Makefile
+#CC = gcc
+CFLAGS += -g -pedantic -std=c99 -Wall -Wextra -Werror
+LDFLAGS += -lm
+LDLIBS += -lm
 
-fibheap.o: fibheap.c fibheap.h
-	$(CC) $(CFLAGS) -c fibheap.c fibheap.h
+#SOURCES := $(wildcard *.c)
+#OBJECTS := $(SOURCES:.c=.o)
+#HEADERS := $(wildcard *.h)
+TARGETS := 	tests
 
-fibheaptest.o: fibheap.h fibheaptest.c
-	$(CC) $(CFLAGS) -c fibheaptest.c
+all: $(TARGETS)
 
-fibheaptest: fibheaptest.o fibheap.o
-	$(CC) $(CFLAGS) fibheaptest.o fibheap.o -o fibheaptest -lm
+valgrind: tests.o
+	valgrind --leak-check=full --track-origins=yes ./tests
 
-graph.o: graph.c graph.h
-	$(CC) $(CFLAGS) -c graph.c graph.h
+gdb: tests.o
+	gdb ./tests
 
-graphtest.o: graph.h graphtest.c
-	$(CC) $(CFLAGS) -c graphtest.c
+#$(TARGETS): $(OBJECTS)
+#	$(CC) $(CFLAGS) $(OBJECTS) -o $@ $(LDFLAGS)
 
-graphtest: graphtest.o graph.o fibheap.o
-	$(CC) $(CFLAGS) graphtest.o graph.o fibheap.o -o graphtest -lm
+graph.o: graph.h
 
-dijkstra.o: dijkstra.c dijkstra.h
-	$(CC) $(CFLAGS) -c dijkstra.c
+tree.o: tree.h dijkstra.o graph.o
 
-dijkstratest.o: dijkstratest.c dijkstra.h
-	$(CC) $(CFLAGS) -c dijkstratest.c
+fibheaptest: fibheap.o
 
-dijkstratest: dijkstratest.o dijkstra.o graph.o fibheap.o
-	$(CC) $(CFLAGS) dijkstratest.o dijkstra.o graph.o fibheap.o -o dijkstratest -lm
+fibheap.o: fibheap.h
+
+bheap.o: bheap.h
+
+dijkstra.o: dijkstra.h fibheap.o bheap.o graph.o
+
+thorup04.o: graph.o tree.o dijkstra.o
+
+tests: tree.o dijkstra.o fibheap.o bheap.o graph.o thorup04.o
 
 clean:
-	rm -f *.o
-	rm -f *.gch
-	rm -f fibheaptest
-	rm -f graphtest
-	rm -f dijkstratest
+	@- rm -f *.o
+	@- rm -f $(TARGETS)
+	@- rm -f *.gch
+	@- rm -f *~
 
-all:
-	make fibheap.o --no-print-directory
-	make fibheaptest.o --no-print-directory
-	make fibheaptest --no-print-directory
-	make graph.o --no-print-directory
-	make graphtest.o --no-print-directory
-	make graphtest --no-print-directory
-	make dijkstra.o --no-print-directory
-	make dijkstratest.o --no-print-directory
-	make dijkstratest --no-print-directory
+.PHONY: all clean

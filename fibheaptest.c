@@ -19,7 +19,7 @@ int main() {
     
     fibheap_print(&fibheap);
     printf("Decrease key 9 to 1.\n");
-    fibheap_decreaseKey(&fibheap, node, 1);
+    fibheap_decrease_key(&fibheap, node, 1);
     fibheap_print(&fibheap);
 
     //fibheap_destroy(&fibheap);
