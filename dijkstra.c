@@ -163,6 +163,12 @@ dijkstra_result_t *dijkstra_sssp(graph_t *graph, int s) {
     return result;
 }
 
+int dijkstra_query(dijkstra_result_t *result, int t) {
+    if (result->valid[t] == 0)
+        return -1;
+    return result->dist[t];
+}
+
 void dijkstra_print(dijkstra_result_t *result) {
     printf("Dijkstra:\n");
     printf("Vertex    dist    prev\n");

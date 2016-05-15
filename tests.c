@@ -103,6 +103,87 @@ int main() {
 
 
     /*
+     * Testing graph copying
+     */
+    graph_t *copy = graph_copy(graph);
+
+    expected = graph->n_v;
+    actual = copy->n_v;
+    if (actual != expected) {
+        printf("Number of vertices in the graph copy is incorrect. Expected %d, got %d\n", expected, actual);
+        exit(EXIT_FAILURE);
+    }
+    expected = graph->n_e;
+    actual = copy->n_e;
+    if (actual != expected) {
+        printf("Number of edges in the graph copy is incorrect. Expected %d, got %d\n", expected, actual);
+        exit(EXIT_FAILURE);
+    }
+
+    vertex_t *v, *vc;
+    for (int i = 0; i < graph->cap_v; i++) {
+        v = graph->V[i];
+        vc = copy->V[i];
+        if (v == NULL) {
+            if (vc == NULL) {
+                continue;
+            } else {
+                printf("Graph copy differs from original graph! (original vertex null, copy not)\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+        if (vc == NULL) {
+            printf("Graph copy differs from original graph! (original vertex not null, copy null) \n");
+            exit(EXIT_FAILURE);
+        }
+        if (v->id != vc->id) {
+            printf("Graph copy differs from original graph! (vertex id's does not match) \n");
+            exit(EXIT_FAILURE);
+        }
+        if (v->n != vc->n) {
+            printf("Graph copy differs from original graph! (vertex number of edges does not match) \n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    edge_t *e, *ec;
+    for (int i = 0; i < graph->cap_e; i++) {
+        e = graph->E[i];
+        ec = copy->E[i];
+        if (e == NULL) {
+            if (ec == NULL) {
+                continue;
+            } else {
+                printf("Graph copy differs from original graph! (original edge null, copy not)\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+        if (ec == NULL) {
+            printf("Graph copy differs from original graph! (original edge not null, copy null) \n");
+            exit(EXIT_FAILURE);
+        }
+        if (e->source->id != ec->source->id || e->target->id != ec->target->id) {
+            printf("Graph copy differs from original graph! (edge sources or target ids does not match) \n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    graph_destroy(copy);
+
+    expected = 13;
+    actual = graph->n_v;
+    if (actual != expected) {
+        printf("Number of vertices in the graph from file is incorrect after copying. Expected %d, got %d\n", expected, actual);
+        exit(EXIT_FAILURE);
+    }
+    expected = 20;
+    actual = graph->n_e;
+    if (actual != expected) {
+        printf("Number of edges in the graph from file is incorrect after copying. Expected %d, got %d\n", expected, actual);
+        exit(EXIT_FAILURE);
+    }
+
+    /*
      * Testing Dijkstra
      */
     dijkstra_result_t *dijkstra_result = dijkstra_sssp(graph, 6);
@@ -323,23 +404,25 @@ int main() {
     /*
      * Testing the second recursion of the main algorithm
      */
-    graph_t *recur2_graph = graph_from_file_M("recursion2_test.txt");
-    path_t *recur2_path = path_create(5);
-    for (int i = 0; i < 5; i++) {
-        recur2_path->V[i] = graph->V[i + 8];
-        recur2_path->d[i] =i;
+    if (1) {
+        graph_t *recur2_graph = graph_from_file_M("recursion2_test.txt");
+        path_t *recur2_path = path_create(5);
+        for (int i = 0; i < 5; i++) {
+            recur2_path->V[i] = graph->V[i + 8];
+            recur2_path->d[i] = i;
+        }
+
+        float eps = 0.5;
+        preprocess_result_t *recur2_result = preprocess_result_create(eps, recur2_graph->n_v);
+        recursion2(recur2_graph, recur2_path, recur2_result);
+
+        if (PRINT_RECUR2 || PRINT_ALL) {
+            printf("N_v: %d\n", recur2_result->n_v);
+            printf("N_p: %d\n", recur2_result->n_p);
+        }
+
     }
 
-    printf("n_v: %d\n", recur2_graph->n_v);
-
-    float eps = 0.5;
-    preprocess_result_t *recur2_result = preprocess_result_create(eps, recur2_graph->n_v);
-    recursion2(recur2_graph, recur2_path, recur2_result);
-
-    if (PRINT_RECUR2 || PRINT_ALL) {
-        printf("N_v: %d\n", recur2_result->n_v);
-        printf("N_p: %d\n", recur2_result->n_p);
-    }
 
     /*
      * Cleaning Up

@@ -17,6 +17,8 @@ void dijkstra_destroy(dijkstra_result_t *result);
 
 dijkstra_result_t *dijkstra_sssp(graph_t *graph, int s);
 
+int dijkstra_query(dijkstra_result_t *result, int t);
+
 void dijkstra_print(dijkstra_result_t *result);
 
 #endif //DIJKSTRA_H

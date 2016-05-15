@@ -134,6 +134,7 @@ path_t **pst(graph_t *graph) {
 }
 
 void recursion2_helper(graph_t *graph, path_t *path, preprocess_result_t *result, int offset) {
+    printf("Her!\n");
     int n = path->n;
     if (n <= 2)
         return;
@@ -150,10 +151,11 @@ void recursion2_helper(graph_t *graph, path_t *path, preprocess_result_t *result
 
     /* For each vertex we add the result from the sssp calculation to the
      * covering set, and remove the vertex from either of the graphs if required. */
-    vertex_t *vertex;
+    vertex_t *vertex, *v1, *v2;
     int vid;
     vertex_result_t *vertex_result;
-    covering_set_t *c;
+    covering_set_t *cset;
+    int v_a, v_b, v_c;
     int eps = result->eps;
 
     for (int i = 0; i < graph->cap_v; i++) {
@@ -164,18 +166,26 @@ void recursion2_helper(graph_t *graph, path_t *path, preprocess_result_t *result
         vid = vertex->id;
         vertex_result = result->V[vid];
 
-        c = vertex_result->C[vertex_result->n - 1];
-        c->d[offset + b] = result_b->dist[vid];
+        cset = vertex_result->C[vertex_result->n - 1];
+        cset->d[offset + b] = result_b->dist[vid];
 
-        if (c->d[offset] >= (1 - eps) * c->d[offset + b] + a_b ||
-            c->d[offset + b] >= (1 - eps) * c->d[offset] + a_b) {
-            graph_remove_vertex(h1, vertex);
-            vertex_destroy(vertex);
+        v_a = cset->d[offset];
+        v_b = cset->d[offset + b];
+        v_c = cset->d[offset + n - 1];
+
+        /* We check if either v_a or v_b epsilon-covers the other */
+        if (v_a >= (1 - eps) * v_b + a_b ||
+            v_b >= (1 - eps) * v_a + a_b) {
+            v1 = h1->V[vid];
+            graph_remove_vertex(h1, v1);
+            vertex_destroy(v1);
         }
-        if (c->d[n] >= (1 - eps) * c->d[offset + b] + b_c ||
-            c->d[offset + b] >= (1 - eps) * c->d[n] + b_c) {
-            graph_remove_vertex(h2, vertex);
-            vertex_destroy(vertex);
+        /* We check if either v_b or v_c epsilon-covers the other */
+        if (v_c >= (1 - eps) * v_b + b_c ||
+            v_b >= (1 - eps) * v_c + b_c) {
+            v2 = h2->V[vid];
+            graph_remove_vertex(h2, v2);
+            vertex_destroy(v2);
         }
     }
     free(result_b);

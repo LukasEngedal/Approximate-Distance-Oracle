@@ -99,7 +99,6 @@ void graph_destroy(graph_t *graph) {
     free(graph);
 }
 
-/* TODO:  */
 graph_t *graph_copy(graph_t *graph) {
     graph_t *g_copy = graph_create();
 
@@ -245,8 +244,10 @@ graph_t *graph_from_file_M(char *filename) {
     return graph;
 }
 
+/* Inserts the given vertex into the given graph, placing it at a position in then
+ * graphs list of vertices equal to it's id. Does not check for overwriting */
 int graph_insert_vertex(graph_t *graph, vertex_t *vertex) {
-    if (graph->n_v >= graph->cap_v) {
+    while (vertex->id >= graph->cap_v) {
         graph->cap_v *= 2;
         vertex_t **new_V = realloc(graph->V, sizeof(vertex_t *) * graph->cap_v);
         if (new_V == NULL)
@@ -258,16 +259,16 @@ int graph_insert_vertex(graph_t *graph, vertex_t *vertex) {
 
         graph->V = new_V;
     }
-    graph->V[graph->n_v] = vertex;
+    graph->V[vertex->id] = vertex;
     graph->n_v++;
 
     return 0;
 }
 
-/* Removes the given edge from the given vertix's list of edges. Does not delete
+/* Removes the given edge from the given vertex's list of edges. Does not delete
  * anything */
 int vertex_remove_edge(vertex_t *vertex, edge_t *edge) {
-    for (int i = 0; i < vertex->n; i++) {
+    for (int i = 0; i < vertex->cap; i++) {
         if (vertex->E[i] == edge) {
             vertex->E[i] = NULL;
             return 0;
@@ -286,8 +287,11 @@ int graph_remove_vertex(graph_t *graph, vertex_t *vertex) {
 
     int ret = 0;
     edge_t *edge;
-    for (int i = 0; i < vertex->n; i++) {
+    for (int i = 0; i < vertex->cap; i++) {
         edge = vertex->E[i];
+        if (edge == NULL)
+            continue;
+
         ret += vertex_remove_edge(edge->source, edge);
         ret += vertex_remove_edge(edge->target, edge);
         edge_destroy(edge);
@@ -355,7 +359,7 @@ void graph_components_helper(char *visited, int *belong, vertex_t *v, int graph)
 }
 
 graph_t **graph_components(graph_t *graph) {
-    int n_v = graph->n_v;
+    int n_v = graph->cap_v;
     int n_graphs = 0;
     int belong[n_v];
     char visited[n_v];
@@ -363,6 +367,9 @@ graph_t **graph_components(graph_t *graph) {
 
     /* We determine the number of graphs and which graph each vertex belongs to */
     for (int i = 0; i < n_v; i++) {
+        if (graph->V[i] == NULL)
+            continue;
+
         if (!visited[i]) {
             graph_components_helper(visited, belong, graph->V[i], n_graphs);
             n_graphs++;
@@ -378,12 +385,18 @@ graph_t **graph_components(graph_t *graph) {
 
     /* We insert the vertices into their respective graphs */
     for (int i = 0; i < n_v; i++) {
+        if (graph->V[i] == NULL)
+            continue;
+
         graph_insert_vertex(graphs[belong[i]], graph->V[i]);
     }
     /* We insert the edges into their respective graphs */
     edge_t *edge;
-    for (int i = 0; i < graph->n_e; i++) {
+    for (int i = 0; i < graph->cap_e; i++) {
         edge = graph->E[i];
+        if (edge == NULL)
+            continue;
+
         graph_insert_edge(graphs[belong[edge->source->id]], edge);
     }
 
@@ -402,8 +415,10 @@ void graph_print(graph_t *graph) {
 
     printf("Graph:\n");
     // For each node in the graph print a line
-    for (int i = 0; i < graph->n_v; i++) {
+    for (int i = 0; i < graph->cap_v; i++) {
         v = graph->V[i];
+        if (v == NULL)
+            continue;
 
         // For each node in the graph, print the weight if there is an edge
         for (int j = 0; j < graph->n_v; j++) {
