@@ -32,7 +32,7 @@ dijkstra_result_t *dijkstra_create(int n, int s) {
 
     for (int i = 0; i < n; i++) {
         valid[i] = 0;
-        dist[i] = INFINITY;
+        dist[i] = 1<<30;
         prev[i] = NULL;
     }
 
@@ -51,60 +51,6 @@ void dijkstra_destroy(dijkstra_result_t *result) {
     free(result->dist);
     free(result->prev);
     free(result);
-}
-
-int dijkstra_bheap(graph_t *graph, dijkstra_result_t *result) {
-    vertex_t *vertex;
-    vertex_t *neighbor;
-    edge_t *edge;
-    bnode_t *bnode;
-    int new_dist;
-    int retval;
-
-    bheap_t *bheap = bheap_create();
-    if (bheap == NULL)
-        return -1;
-
-    for (int i = 0; i < graph->cap_v; i++) {
-        vertex = graph->V[i];
-        if (vertex == NULL)
-            continue;
-        result->valid[i] = 1;
-
-        bnode = bnode_create();
-        if (bnode == NULL)
-            return -1;
-
-        bnode->owner = (void *)vertex;
-        vertex->node = (void *)bnode;
-        retval = bheap_insert(bheap, bnode, result->dist[i]);
-        if (retval)
-            return -1;
-    }
-
-    while (!bheap_empty(bheap)) {
-        bnode = bheap_extract_min(bheap);
-        if (bnode == NULL)
-            return -1;
-
-        vertex = (vertex_t *)bnode->owner;
-
-        for (int i = 0; i < vertex->n; i++) {
-            edge = vertex->E[i];
-            neighbor = edge_other_vertex(vertex, edge);
-            new_dist = result->dist[vertex->id] + edge->w;
-            if (result->dist[neighbor->id] > new_dist) {
-                result->dist[neighbor->id] = new_dist;
-                result->prev[neighbor->id] = vertex;
-                retval = bheap_decrease_key(bheap, neighbor->node, new_dist);
-                if (retval)
-                    return -1;
-            }
-        }
-        bnode_destroy(bnode);
-    }
-    bheap_destroy(bheap);
-    return 0;
 }
 
 void dijkstra_fibheap(graph_t *graph, dijkstra_result_t *result) {
@@ -128,37 +74,91 @@ void dijkstra_fibheap(graph_t *graph, dijkstra_result_t *result) {
 
     while (!fibheap_empty(fibheap)) {
         node = fibheap_extract_min(fibheap);
-        vertex = node->owner;
+        vertex = (vertex_t *)node->owner;
+        edge = vertex->edge;
 
         for (int i = 0; i < vertex->n; i++) {
-            edge = vertex->E[i];
-            neighbor = edge_other_vertex(vertex, edge);
+            neighbor = edge->target;
             new_dist = result->dist[vertex->id] + edge->w;
             if (result->dist[neighbor->id] > new_dist) {
                 result->dist[neighbor->id] = new_dist;
                 result->prev[neighbor->id] = vertex;
                 fibheap_decrease_key(fibheap, neighbor->node, new_dist);
             }
+            edge = edge->c;
         }
         free(node);
     }
     free(fibheap);
 }
 
+int dijkstra_bheap(graph_t *graph, dijkstra_result_t *result) {
+    vertex_t *vertex;
+    vertex_t *neighbor;
+    edge_t *edge;
+    bnode_t *bnode;
+    int new_dist;
+
+    bheap_t *bheap = bheap_create();
+    if (bheap == NULL)
+        return -1;
+
+    for (int i = 0; i < graph->cap_v; i++) {
+        vertex = graph->V[i];
+        if (vertex == NULL)
+            continue;
+        result->valid[i] = 1;
+
+        bnode = bnode_create();
+        if (bnode == NULL)
+            return -1;
+
+        bnode->owner = (void *)vertex;
+        vertex->node = (void *)bnode;
+        if (bheap_insert(bheap, bnode, result->dist[i]))
+            return -1;
+    }
+
+    while (!bheap_empty(bheap)) {
+        bnode = bheap_extract_min(bheap);
+        if (bnode == NULL)
+            return -1;
+
+        vertex = (vertex_t *)bnode->owner;
+        edge = vertex->edge;
+
+        for (int i = 0; i < vertex->n; i++) {
+            neighbor = edge->target;
+            new_dist = result->dist[vertex->id] + edge->w;
+            //if (new_dist < 0 || new_dist > 1<<30)
+            //    printf("dijkstra_bheap: extreme dist: %d\n", new_dist);
+            if (result->dist[neighbor->id] > new_dist) {
+                result->dist[neighbor->id] = new_dist;
+                result->prev[neighbor->id] = vertex;
+                if (bheap_decrease_key(bheap, (bnode_t *)neighbor->node, new_dist))
+                    return -1;
+            }
+            edge = edge->c;
+        }
+        bnode_destroy(bnode);
+    }
+    bheap_destroy(bheap);
+
+    return 0;
+}
+
 dijkstra_result_t *dijkstra_sssp(graph_t *graph, int s) {
-    if (s >= graph->cap_v || s < 0)
+    if (s >= graph->cap_v || s < 0 || graph->V[s] == NULL)
         return NULL;
 
     dijkstra_result_t *result = dijkstra_create(graph->cap_v, s);
 
-    int retval;
     if (HEAPTYPE) {
-        retval = dijkstra_bheap(graph, result);
+        if (dijkstra_bheap(graph, result))
+            return NULL;
     } else {
         dijkstra_fibheap(graph, result);
     }
-    if (retval)
-        return NULL;
 
     return result;
 }

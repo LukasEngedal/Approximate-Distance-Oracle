@@ -20,9 +20,11 @@ gdb: tests.o
 #$(TARGETS): $(OBJECTS)
 #	$(CC) $(CFLAGS) $(OBJECTS) -o $@ $(LDFLAGS)
 
-graph.o: graph.h
+graph.o: graph.h tree.c
 
-tree.o: tree.h dijkstra.o graph.o
+tree.o: tree.h dijkstra.o graph.o queue.o
+
+queue.o: queue.h
 
 fibheaptest: fibheap.o
 
@@ -34,7 +36,7 @@ dijkstra.o: dijkstra.h fibheap.o bheap.o graph.o
 
 thorup04.o: graph.o tree.o dijkstra.o
 
-tests: tree.o dijkstra.o fibheap.o bheap.o graph.o thorup04.o
+tests: tree.o dijkstra.o fibheap.o bheap.o graph.o thorup04.o queue.o
 
 clean:
 	@- rm -f *.o

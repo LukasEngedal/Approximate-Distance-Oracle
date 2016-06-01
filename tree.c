@@ -1,16 +1,20 @@
 #include <math.h>
 #include "tree.h"
+#include "queue.h"
+#include "graph.h"
 
 treenode_t *treenode_create(int value) {
     treenode_t *treenode = malloc(sizeof(treenode_t));
     if (treenode == NULL)
         return NULL;
 
+    treenode->value = value;
+    treenode->lvl = -1;
+    treenode->size = -1;
     treenode->parent = NULL;
     treenode->child = NULL;
     treenode->sibling = NULL;
     treenode->owner = NULL;
-    treenode->value = value;
 
     return treenode;
 }
@@ -28,6 +32,7 @@ tree_t *tree_create(treenode_t *root) {
     tree->root = root;
     tree->size = 1;
     root->id = 0;
+    root->lvl = 0;
 
     return tree;
 }
@@ -48,6 +53,10 @@ void tree_destroy(tree_t *tree) {
 }
 
 void tree_insert_treenode(tree_t *tree, treenode_t *parent, treenode_t *treenode) {
+    if (parent == NULL || treenode == NULL) {
+        printf("tree_insert_treenode: treenode or parent null.\n");
+        exit(EXIT_FAILURE);
+    }
     if (parent->child == NULL) {
         parent->child = treenode;
     } else {
@@ -60,16 +69,98 @@ void tree_insert_treenode(tree_t *tree, treenode_t *parent, treenode_t *treenode
     treenode->parent = parent;
     treenode->id = tree->size;
     tree->size++;
+    treenode->lvl = parent->lvl + 1;
 }
 
+path_t *tree_root_path(treenode_t *treenode) {
+    int lvl = treenode->lvl;
+    path_t *path = path_create(lvl + 1);
+
+    treenode_t *node = treenode;
+    for (int i = lvl; i >= 0; i--) {
+        path->V[i] = (vertex_t *)node->owner;
+        path->d[i] = node->value;
+        node = node->parent;
+    }
+
+    return path;
+}
+
+void tree_level_helper(treenode_t *treenode, int lvl) {
+    if (treenode != NULL) {
+        treenode->lvl = lvl;
+        tree_level_helper(treenode->sibling, lvl);
+        tree_level_helper(treenode->child, lvl + 1);
+    }
+}
+
+void tree_set_levels(tree_t *tree) {
+    tree_level_helper(tree->root, 0);
+}
+
+int tree_size_helper(treenode_t *treenode) {
+    if (treenode == NULL)
+        return 0;
+
+    int siblings = tree_size_helper(treenode->sibling);
+    int children = tree_size_helper(treenode->child);
+    treenode->size = children + 1;
+    return children + siblings + 1;
+}
+
+void tree_set_sizes(tree_t *tree) {
+    tree_size_helper(tree->root);
+}
+
+tree_t *breath_first_tree(graph_t *graph, vertex_t *vertex) {
+    graph_reset_nodes(graph);
+
+    treenode_t *root = treenode_create(0);
+    root->owner = (void *)vertex;
+    vertex->node = (void *)root;
+    tree_t *tree = tree_create(root);
+
+    queue_t *Q = queue_create();
+    queue_push(Q, (void *)vertex);
+
+    vertex_t *v, *u;
+    edge_t *e;
+    treenode_t *vnode, *unode;
+    while (Q->size > 0) {
+        v = (vertex_t *)queue_pop(Q);
+        vnode = (treenode_t *)v->node;
+        e = v->edge;
+        for (int i = 0; i < v->n; i++) {
+            u = e->target;
+            if (u->node == NULL) {
+                unode = treenode_create(vnode->value + e->w);
+                unode->owner = (void *)u;
+                u->node = (void *)unode;
+                tree_insert_treenode(tree, vnode, unode);
+                queue_push(Q, (void *)u);
+            }
+
+            e = e->c;
+        }
+    }
+    queue_destroy(Q);
+
+    tree_set_sizes(tree);
+    tree_set_levels(tree);
+    return tree;
+}
 
 tree_t *shortest_path_tree(graph_t *graph, int s) {
-    int n = graph->n_v;
+    if (graph->V[s] == NULL)
+        return NULL;
 
     dijkstra_result_t *result = dijkstra_sssp(graph, s);
 
     treenode_t *treenode;
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < graph->cap_v; i++) {
+        if (graph->V[i] == NULL)
+            continue;
+
         treenode = treenode_create(0);
         treenode->owner = (void *)graph->V[i];
         graph->V[i]->node = (void *)treenode;
@@ -77,12 +168,14 @@ tree_t *shortest_path_tree(graph_t *graph, int s) {
     tree_t *tree = tree_create((treenode_t *)graph->V[s]->node);
 
     vertex_t *vertex;
-    for (int i = 0; i < n; i++) {
-        if (i == s) {
+    for (int i = 0; i < graph->cap_v; i++) {
+        if (i == s)
             continue;
-        }
 
         vertex = graph->V[i];
+        if (vertex == NULL)
+            continue;
+
         if (result->prev[i] == NULL) {
             printf("Error (shortest_path_tree): Graph is not connected!\n");
             exit(EXIT_FAILURE);
@@ -94,27 +187,10 @@ tree_t *shortest_path_tree(graph_t *graph, int s) {
     }
 
     dijkstra_destroy(result);
+
+    tree_set_sizes(tree);
+    tree_set_levels(tree);
     return tree;
-}
-
-path_t *tree_root_path(tree_t *tree, treenode_t *treenode) {
-    int lvl = 0;
-    treenode_t *root = tree->root;
-    treenode_t *tmp = treenode;
-    while (tmp != root) {
-        tmp = tmp->parent;
-        lvl++;
-    }
-
-    path_t *path = path_create(lvl + 1);
-    tmp = treenode;
-    for (int i = lvl; i > 0; i--) {
-        path->V[i] = (vertex_t *)tmp->owner;
-        path->d[i] = tmp->value;
-        tmp = tmp->parent;
-    }
-
-    return path;
 }
 
 
@@ -172,21 +248,6 @@ lca_result_t *lca_result_create(int n) {
     result->k = 0;
 
     return result;
-}
-
-int floor_log2(int x) {
-    int res = 0;
-    while(x>>=1)
-        res++;
-    return res;
-}
-
-int ceil_log2(int x) {
-    int res = 1;
-    x--;
-    while(x>>=1)
-        res++;
-    return res;
 }
 
 int first_transversal(treenode_t *treenode, lca_result_t *result) {
@@ -306,4 +367,48 @@ treenode_t *lca(lca_result_t *result, treenode_t *treenode1, treenode_t *treenod
     inlabelz = inlabelz;
 
     return NULL;
+}
+
+treenode_t *tree_lca_simple(treenode_t *treenode1, treenode_t *treenode2) {
+    int n1 = treenode1->lvl+1;
+    int n2 = treenode2->lvl+1;
+
+    treenode_t *path1[n1];
+    treenode_t *path2[n2];
+
+    treenode_t *t = treenode1;
+    for (int i = n1-1; i >= 0; i--) {
+        path1[i] = t;
+        t = t->parent;
+    }
+    t = treenode2;
+    for (int i = n2-1; i >= 0; i--) {
+        path2[i] = t;
+        t = t->parent;
+    }
+
+    int i = 0;
+    while (path1[i] == path2[i]) {
+        i++;
+        if (i >= n1 || i >= n2)
+            break;
+    }
+    i--;
+
+    return path1[i];
+}
+
+int floor_log2(int x) {
+    int res = 0;
+    while(x>>=1)
+        res++;
+    return res;
+}
+
+int ceil_log2(int x) {
+    int res = 1;
+    x--;
+    while(x>>=1)
+        res++;
+    return res;
 }

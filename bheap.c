@@ -1,9 +1,9 @@
 #include "bheap.h"
 #include <math.h>
 
-#define PARENT(i) (int) floor((i - 1) / 2)
-#define LEFT(i) i * 2 + 1
-#define RIGHT(i) i * 2 + 2
+#define PARENT(i) (i - 1) >> 1
+#define LEFT(i) (i << 1) + 1
+#define RIGHT(i) (i << 1) + 2
 
 bnode_t *bnode_create() {
     bnode_t *bnode = malloc(sizeof(bnode_t));
@@ -11,7 +11,7 @@ bnode_t *bnode_create() {
         return NULL;
 
     bnode->i = -1;
-    bnode->key = INFINITY;
+    bnode->key = 1<<30;
     bnode->owner = NULL;
 
     return bnode;
@@ -29,6 +29,7 @@ bheap_t *bheap_create() {
 
     bheap->cap = BHEAP_INIT_SIZE;
     bheap->n = 0;
+
     bheap->A = malloc(sizeof(bnode_t *) * bheap->cap);
     if (bheap->A == NULL) {
         free(bheap);
@@ -60,12 +61,12 @@ void min_heapify(bheap_t *bheap, int i) {
     int smallest;
     int l = LEFT(i);
     int r = RIGHT(i);
-    if (l <= bheap->n && bheap->A[l]->key < bheap->A[i]->key) {
+    if (l < bheap->n && bheap->A[l]->key < bheap->A[i]->key) {
         smallest = l;
     } else {
         smallest = i;
     }
-    if (r <= bheap->n && bheap->A[r]->key < bheap->A[smallest]->key) {
+    if (r < bheap->n && bheap->A[r]->key < bheap->A[smallest]->key) {
         smallest = r;
     }
     if (smallest != i) {
@@ -96,7 +97,14 @@ bnode_t *bheap_extract_min(bheap_t *bheap) {
         return NULL;
 
     bnode_t *bnode = bheap->A[0];
+    if (bheap->n == 1) {
+        bheap->A[0] = NULL;
+        bheap->n--;
+        return bnode;
+    }
+
     bheap->A[0] = bheap->A[bheap->n - 1];
+    bheap->A[bheap->n - 1] = NULL;
     bheap->A[0]->i = 0;
     bheap->n--;
     min_heapify(bheap, 0);
@@ -104,6 +112,8 @@ bnode_t *bheap_extract_min(bheap_t *bheap) {
 }
 
 int bheap_decrease_key(bheap_t *bheap, bnode_t *bnode, int key) {
+    if (key < 0)
+        printf("bheap_decrease_key: negative key: %d\n", key);
     if (key > bnode->key)
         return -1;
 

@@ -7,7 +7,7 @@
 
 #define RESULT_INIT_P_SIZE 3
 
-/* A covering_set_t object contains a list with the distance from each of the
+/* A covering_set_t object contains a list of the distance from each of the
  * vertices in the particular path to the particular vertex.
  * -1 indicates no connection.
  */
@@ -52,11 +52,14 @@ preprocess_result_t *preprocess_result_create(float eps, int n);
 void preprocess_result_destroy(preprocess_result_t *result); /* TODO:  */
 
 /* Planar Separator Theorem */
+int tree_cycle_weight(edge_t *edge, edge_t *edge3);
+path_t **pst2(graph_t *graph);
 path_t **pst(graph_t *graph);
 
 void recursion2(graph_t *graph, path_t *path, preprocess_result_t *result);
-preprocess_result_t *preprocess(graph_t *graph, float eps);
+preprocess_result_t *thorup_preprocess(graph_t *graph, float eps);
 
-int query(preprocess_result_t *result);
+int covering_set_dist(covering_set_t *c_s, covering_set_t *c_t, int *p_d);
+int thorup_query(preprocess_result_t *result, int s, int t);
 
 #endif /* THORUP04_H */
