@@ -100,8 +100,20 @@ void graph_destroy(graph_t *graph) {
 }
 
 graph_t *graph_copy(graph_t *graph) {
-    graph_t *g_copy = graph_create();
+    /* We create the copy and expand the E array */
+    graph_t *gc = graph_create();
+    gc->i_e = graph->i_e;
 
+    edge_t **new_E = realloc(gc->E, sizeof(edge_t *) * graph->cap_e);
+    if (new_E == NULL)
+        return NULL;
+    gc->E = new_E;
+    gc->cap_e = graph->cap_e;
+    for (int i = 0; i < gc->cap_e; i++) {
+        gc->E[i] = NULL;
+    }
+
+    /* We copy over all the vertices */
     vertex_t *vertex;
     vertex_t *v_copy;
     for (int i = 0; i < graph->cap_v; i++) {
@@ -110,22 +122,80 @@ graph_t *graph_copy(graph_t *graph) {
             continue;
 
         v_copy = vertex_create(vertex->id);
-        graph_insert_vertex(g_copy, v_copy);
+        graph_insert_vertex(gc, v_copy);
+        //v_copy->n = vertex->n;
     }
 
-    edge_t *edge;
-    edge_t *e_copy;
-    for (int i = 0; i < graph->cap_e; i++) {
-        edge = graph->E[i];
-        if (edge == NULL)
+    /* We copy over all the edges */
+    edge_t *e, *ec;
+    for (int i = 0; i < graph->cap_v; i++) {
+        vertex = graph->V[i];
+        if (vertex == NULL)
             continue;
 
-        e_copy = edge_create(g_copy->V[edge->source->id], g_copy->V[edge->target->id], edge->w);
-        graph_insert_edge(g_copy, e_copy);
+        e = vertex->edge;
+        for (int j = 0; j < vertex->n; j++) {
+            ec = edge_create(gc->V[e->source->id], gc->V[e->target->id], e->w);
+            ec->id = e->id;
+            graph_insert_edge(gc, ec);
+
+            e = e->c;
+        }
     }
 
-    graph_undirect(g_copy);
-    return g_copy;
+    /* We set the edge->undirect pointers */
+    for (int i = 0; i < graph->cap_e; i++) {
+        e = graph->E[i];
+        ec = gc->E[i];
+        if (e == NULL)
+            continue;
+
+        ec->undirect = gc->E[e->undirect->id];
+    }
+    /* We adjust the graph copy E array */
+    /* edge_t **new_E = malloc(sizeof(edge_t *) * graph->cap_e); */
+    /* free(gc->E); */
+    /* gc->E = new_E; */
+    /* gc->cap_e = graph->cap_e; */
+
+
+    /* edge_t *edge; */
+    /* edge_t *e_copy; */
+    /* for (int i = 0; i < graph->cap_e; i++) { */
+    /*     edge = graph->E[i]; */
+    /*     if (edge == NULL) { */
+    /*         gc->E[i] = NULL; */
+    /*         continue; */
+    /*     } */
+
+    /*     e_copy = edge_create(gc->V[edge->source->id], gc->V[edge->target->id], edge->w); */
+    /*     gc->E[i] = e_copy; */
+    /*     e_copy->id = i; */
+    /*     gc->n_e++; */
+    /* } */
+
+    /* /\* We set the vertex edge pointers *\/ */
+    /* for (int i = 0; i < graph->cap_v; i++) { */
+    /*     vertex = graph->V[i]; */
+    /*     if (vertex == NULL) */
+    /*         continue; */
+
+    /*     v_copy = gc->V[i]; */
+    /*     v_copy->edge = gc->E[vertex->edge->id]; */
+    /* } */
+
+    /* /\* We set the edge c and cc pointers *\/ */
+    /* for (int i = 0; i < graph->cap_e; i++) { */
+    /*     edge = graph->E[i]; */
+    /*     if (edge == NULL) */
+    /*         continue; */
+
+    /*     e_copy = gc->E[edge->id]; */
+    /*     e_copy->c = gc->E[edge->c->id]; */
+    /*     e_copy->cc = gc->E[edge->cc->id]; */
+    /* } */
+
+    return gc;
 }
 
 void graph_reset_nodes(graph_t *graph) {
@@ -228,6 +298,138 @@ int graph_insert_vertex(graph_t *graph, vertex_t *vertex) {
     return 0;
 }
 
+/* Removes the given vertex from the given graph, deleting all edges, but not
+ * the vertex itself */
+vertex_t *graph_remove_vertex(graph_t *graph, vertex_t *vertex) {
+    if (vertex == NULL)
+        return NULL;
+
+    if (graph->V[vertex->id] != vertex) {
+        printf("WTF?\n");
+        exit(EXIT_FAILURE);
+    }
+
+    graph->V[vertex->id] = NULL;
+    graph->n_v--;
+
+    int n = vertex->n;
+    if (n == 0)
+        return 0;
+
+    edge_t *edge = vertex->edge;
+    edge_t *next;
+    if (edge == NULL) {
+        printf("Why is edge NULL when v->n is not 0?\n");
+        exit(EXIT_FAILURE);
+    }
+    for (int i = 0; i < n; i++) {
+        next = edge->c;
+
+        graph_remove_edge(graph, edge);
+        graph_remove_edge(graph, edge->undirect);
+        edge_destroy(edge->undirect);
+        edge_destroy(edge);
+
+        edge = next;
+    }
+
+    return vertex;
+}
+
+void vertex_insert_edge(vertex_t *vertex, edge_t *edge) {
+    if (edge->source != vertex) {
+        printf("vertex_insert_edge: edge->source->id does not match vertex->id\n");
+        exit(EXIT_FAILURE);
+    }
+    vertex->n++;
+
+    edge_t *first = vertex->edge;
+    if (first == NULL) {
+        vertex->edge = edge;
+        edge->c = edge;
+        edge->cc = edge;
+        return;
+    }
+
+    first->cc->c = edge;
+    edge->cc = first->cc;
+
+    first->cc = edge;
+    edge->c = first;
+}
+
+int graph_insert_edge(graph_t *graph, edge_t *edge) {
+    if (edge->id == -1) {
+        edge->id = graph->i_e;
+        graph->i_e++;
+    }
+
+    if (edge->id >= graph->cap_e) {
+        int old = graph->cap_e;
+        while (edge->id >= graph->cap_e)
+            graph->cap_e *= 2;
+        edge_t **new_E = realloc(graph->E, sizeof(edge_t *) * graph->cap_e);
+        if (new_E == NULL)
+            return -1;
+
+        for (int i = old; i < graph->cap_e; i++) {
+            new_E[i] = NULL;
+        }
+
+        graph->E = new_E;
+    }
+
+    if (graph->E[edge->id] != NULL)
+        printf("Pas på!\n");
+    graph->E[edge->id] = edge;
+    graph->n_e++;
+
+    vertex_insert_edge(edge->source, edge);
+
+    return 0;
+}
+
+void vertex_insert_edge_at(vertex_t *vertex, edge_t *edge, edge_t *next) {
+    vertex->n++;
+
+    next->cc->c = edge;
+    edge->cc = next->cc;
+
+    next->cc = edge;
+    edge->c = next;
+}
+
+int graph_insert_edge_at(graph_t *graph, edge_t *edge, edge_t *next) {
+    if (edge->id == -1) {
+        edge->id = graph->i_e;
+        graph->i_e++;
+    }
+
+    if (edge->id >= graph->cap_e) {
+        int old = graph->cap_e;
+        while (edge->id >= graph->cap_e)
+            graph->cap_e *= 2;
+        edge_t **new_E = realloc(graph->E, sizeof(edge_t *) * graph->cap_e);
+        if (new_E == NULL)
+            return -1;
+
+        for (int i = old; i < graph->cap_e; i++) {
+            new_E[i] = NULL;
+        }
+
+        graph->E = new_E;
+    }
+
+    if (graph->E[edge->id] != NULL)
+        printf("Pas på!\n");
+    graph->E[edge->id] = edge;
+    graph->n_e++;
+
+    vertex_insert_edge_at(edge->source, edge, next);
+
+    return 0;
+}
+
 /* Removes the given edge from the given vertex's linked list of edges. Does not
  * delete anything */
 int vertex_remove_edge(vertex_t *vertex, edge_t *edge) {
@@ -258,76 +460,6 @@ int vertex_remove_edge(vertex_t *vertex, edge_t *edge) {
     return 0;
 }
 
-/* Removes the given vertex from the given graph, deleting all edges, but not
- * the vertex itself */
-int graph_remove_vertex(graph_t *graph, vertex_t *vertex) {
-    if (graph->V[vertex->id] != vertex || vertex == NULL)
-        return -1;
-
-    graph->V[vertex->id] = NULL;
-    graph->n_v--;
-
-    int n = vertex->n;
-    if (n == 0)
-        return 0;
-
-    edge_t *edge = vertex->edge;
-    edge_t *next;
-    for (int i = 0; i < n; i++) {
-        next = edge->c;
-
-        graph_remove_edge(graph, edge);
-        graph_remove_edge(graph, edge->undirect);
-        edge_destroy(edge->undirect);
-        edge_destroy(edge);
-
-        edge = next;
-    }
-
-    return 0;
-}
-
-void vertex_insert_edge(vertex_t *vertex, edge_t *edge) {
-    vertex->n++;
-
-    edge_t *first = vertex->edge;
-    if (first == NULL) {
-        vertex->edge = edge;
-        edge->c = edge;
-        edge->cc = edge;
-        return;
-    }
-
-    first->cc->c = edge;
-    edge->cc = first->cc;
-
-    first->cc = edge;
-    edge->c = first;
-}
-
-int graph_insert_edge(graph_t *graph, edge_t *edge) {
-    if (graph->i_e >= graph->cap_e) {
-        graph->cap_e *= 2;
-        edge_t **new_E = realloc(graph->E, sizeof(edge_t *) * graph->cap_e);
-        if (new_E == NULL)
-            return -1;
-
-        for (int i = graph->i_e; i < graph->cap_e; i++) {
-            new_E[i] = NULL;
-        }
-
-        graph->E = new_E;
-    }
-    graph->E[graph->i_e] = edge;
-    edge->id = graph->i_e;
-    graph->i_e++;
-    graph->n_e++;
-
-    vertex_insert_edge(edge->source, edge);
-
-    return 0;
-}
-
 int graph_remove_edge(graph_t *graph, edge_t *edge) {
     int ret = vertex_remove_edge(edge->source, edge);
     graph->E[edge->id] = NULL;
@@ -338,7 +470,7 @@ int graph_remove_edge(graph_t *graph, edge_t *edge) {
 
 void graph_undirect(graph_t *graph) {
     vertex_t *s, *t;
-    edge_t *e, *d;
+    edge_t *e, *u;
     for (int i = 0; i < graph->cap_e; i++) {
         e = graph->E[i];
         if (e == NULL || e->undirect != NULL)
@@ -347,20 +479,23 @@ void graph_undirect(graph_t *graph) {
         s = e->source;
         t = e->target;
 
-        d = t->edge;
+        u = t->edge;
         for (int j = 0; j < t->n; j++) {
-            if (d->target == s) {
-                d->undirect = e;
-                e->undirect = d;
+            if (u->target == s) {
+                u->undirect = e;
+                e->undirect = u;
                 break;
             }
-            d = d->c;
+            u = u->c;
         }
     }
 }
 
 /* Split the given path at vertex i, returning the part of the path from i to n */
 path_t *path_split(path_t *path, int i) {
+    if (path->n == 0)
+        return NULL;
+
     path_t *path2 = path_create(path->n - i);
 
     int offset = path->d[i];
@@ -453,12 +588,11 @@ path_t *path_flip(path_t *path) {
 
 /* Removes all the vertices of the given path from the given graph */
 int graph_remove_path(graph_t *graph, path_t *path) {
-    int ret = 0;
     for (int i = 0; i < path->n; i++) {
-        ret += graph_remove_vertex(graph, path->V[i]);
+        graph_remove_vertex(graph, path->V[i]);
     }
 
-    return ret;
+    return 0;
 }
 
 void graph_components_helper(vertex_t *v, int graph, int *visited, int *belong) {
@@ -498,8 +632,21 @@ graph_t **graph_components(graph_t *graph) {
 
     /* We set up the array of graphs, and end with a NULL in order to indicate array length */
     graph_t **graphs = malloc(sizeof(graph_t *) * (n_graphs + 1));
+    graph_t *g;
     for (int i = 0; i < n_graphs; i++) {
-        graphs[i] = graph_create();
+        g = graph_create();
+        g->i_e = graph->i_e;
+
+        edge_t **new_E = realloc(g->E, sizeof(edge_t *) * graph->cap_e);
+        if (new_E == NULL)
+            return NULL;
+        g->E = new_E;
+        g->cap_e = graph->cap_e;
+        for (int i = 0; i < g->cap_e; i++) {
+            g->E[i] = NULL;
+        }
+
+        graphs[i] = g;
     }
     graphs[n_graphs] = NULL;
 
@@ -511,16 +658,17 @@ graph_t **graph_components(graph_t *graph) {
 
         graph_insert_vertex(graphs[belong[i]], v);
     }
+
     /* We insert the edges into their respective graphs */
-    edge_t *edge;
+    edge_t *e;
     for (int i = 0; i < graph->cap_e; i++) {
-        edge = graph->E[i];
-        if (edge == NULL)
+        e = graph->E[i];
+        if (e == NULL)
             continue;
 
-        v = edge->source;
-        graph_insert_edge(graphs[belong[v->id]], edge);
-        v->n--;
+        g = graphs[belong[e->source->id]];
+        g->E[e->id] = e;
+        g->n_e++;
     }
 
     /* We clean up the old graph */
@@ -614,7 +762,46 @@ graph_t *graph_from_file_M(char *filename) {
     return graph;
 }
 
-/* Generates a graph in the form of a triangulated grid. Assumes x, y > 1 */
+void graph_triangulate(graph_t *graph) {
+    edge_t *e1, *e2, *e3, *e4, *new, *new_u;
+    for (int i = 0; i < graph->cap_e; i++) {
+        e1 = graph->E[i];
+        if (e1 == NULL)
+            continue;
+
+        e2 = e1->undirect->cc;
+        e3 = e2->undirect->cc;
+        e4 = e3->undirect->cc;
+
+        if (e1 != e4) {
+            new = edge_create(graph->V[e1->source->id], graph->V[e3->source->id], 0);
+            graph_insert_edge_at(graph, new, e1->c);
+
+            new_u = edge_create(graph->V[e3->source->id], graph->V[e1->source->id], 0);
+            graph_insert_edge_at(graph, new_u, e3->c);
+
+            new->undirect = new_u;
+            new_u->undirect = new;
+        }
+
+        e2 = e1->undirect->c;
+        e3 = e2->undirect->c;
+        e4 = e3->undirect->c;
+
+        if (e1 != e4) {
+            new = edge_create(graph->V[e1->source->id], graph->V[e3->source->id], 0);
+            graph_insert_edge_at(graph, new, e1);
+
+            new_u = edge_create(graph->V[e3->source->id], graph->V[e1->source->id], 0);
+            graph_insert_edge_at(graph, new_u, e3);
+
+            new->undirect = new_u;
+            new_u->undirect = new;
+        }
+    }
+}
+
+/* Generates a graph in the form of a triangulated grid. Assumes x, y > 2 */
 graph_t *graph_generate(int x, int y, int maxw) {
     int n = x * y;
     graph_t *graph = graph_create();
@@ -669,36 +856,60 @@ graph_t *graph_generate(int x, int y, int maxw) {
     }
 
     /* We triangulate the outer face */
-    /* int s = rand() % x; */
-    /* for (int i = 0; i < x; i++) { */
-    /*     /\* North side *\/ */
-    /*     if (i != s) { */
-    /*         e = edge_create(graph->V[s], graph->V[i], 0); */
-    /*         graph_insert_edge(graph, e); */
-    /*         e = edge_create(graph->V[i], graph->V[s], 0); */
-    /*         graph_insert_edge(graph, e); */
-    /*     } */
-
-    /*     /\* East side *\/ */
-    /*     e = edge_create(graph->V[s], graph->V[(i+1)*x-1], 0); */
+    graph_undirect(graph);
+    graph_triangulate(graph);
+    /* int si = rand() % (x - 4) + 2; */
+    /* vertex_t *s = graph->V[si]; */
+    /* edge_t *c; */
+    /* /\* North side part 1 *\/ */
+    /* for (int i = si-2; i >= 0; i--) { */
+    /*     v = graph->V[i]; */
+    /*     e = edge_create(s, v, 0); */
     /*     graph_insert_edge(graph, e); */
-    /*     e = edge_create(graph->V[(i+1)*x-1], graph->V[s], 0); */
-    /*     graph_insert_edge(graph, e); */
-
-    /*     /\* West side *\/ */
-    /*     e = edge_create(graph->V[s], graph->V[i*x], 0); */
-    /*     graph_insert_edge(graph, e); */
-    /*     e = edge_create(graph->V[i*x], graph->V[s], 0); */
-    /*     graph_insert_edge(graph, e); */
-
-    /*     /\* South side *\/ */
-    /*     e = edge_create(graph->V[s], graph->V[n-x+i], 0); */
-    /*     graph_insert_edge(graph, e); */
-    /*     e = edge_create(graph->V[n-x+i], graph->V[s], 0); */
+    /*     e = edge_create(v, s, 0); */
     /*     graph_insert_edge(graph, e); */
     /* } */
 
-    graph_undirect(graph);
+    /* /\* West side *\/ */
+    /* for (int i = 1; i < y; i++) { */
+    /*     v = graph->V[i*x]; */
+    /*     e = edge_create(s, v, 0); */
+    /*     graph_insert_edge(graph, e); */
+    /*     e = edge_create(v, s, 0); */
+    /*     c = v->edge->cc; */
+    /*     graph_insert_edge_at(graph, e, c); */
+    /* } */
+
+    /* /\* South side *\/ */
+    /* for (int i = 1; i < x-1; i++) { */
+    /*     v = graph->V[n-x+i]; */
+    /*     e = edge_create(s, v, 0); */
+    /*     graph_insert_edge(graph, e); */
+    /*     e = edge_create(v, s, 0); */
+    /*     c = v->edge->c; */
+    /*     graph_insert_edge_at(graph, e, c); */
+    /* } */
+
+    /* /\* East side *\/ */
+    /* for (int i = 0; i < y; i++) { */
+    /*     v = graph->V[n-1-i*x]; */
+    /*     e = edge_create(s, v, 0); */
+    /*     graph_insert_edge(graph, e); */
+    /*     e = edge_create(v, s, 0); */
+    /*     c = v->edge; */
+    /*     graph_insert_edge_at(graph, e, c); */
+    /* } */
+
+    /* /\* North side part 2 *\/ */
+    /* for (int i = x-2; i > si+1; i--) { */
+    /*     v = graph->V[i]; */
+    /*     e = edge_create(s, v, 0); */
+    /*     graph_insert_edge(graph, e); */
+    /*     e = edge_create(v, s, 0); */
+    /*     graph_insert_edge(graph, e); */
+    /* } */
+
+    /* graph_undirect(graph); */
 
     edge_t *e_undirect;
     for (int i = 0; i < graph->n_e; i++) {
@@ -718,7 +929,6 @@ graph_t *graph_generate(int x, int y, int maxw) {
             printf("Her??\n");
         }
     }
-
 
     return graph;
 }

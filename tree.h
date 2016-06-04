@@ -45,8 +45,8 @@ path_t *tree_root_path(treenode_t *treenode);
 void tree_set_levels(tree_t *tree);
 void tree_set_sizes(tree_t *tree);
 
-tree_t *breath_first_tree(graph_t *graph, vertex_t *root);
-tree_t *shortest_path_tree(graph_t *graph, int i);
+tree_t *breath_first_tree(graph_t *graph, int id);
+tree_t *shortest_path_tree(graph_t *graph, int id);
 
 lca_result_t *lca_pre(tree_t *tree);
 void lca_result_destroy(lca_result_t *result);

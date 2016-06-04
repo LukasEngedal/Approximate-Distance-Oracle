@@ -59,7 +59,7 @@ path_t *path_copy(graph_t *graph, path_t *path);
 int path_expand(path_t *path, int n);
 
 int graph_insert_vertex(graph_t *graph, vertex_t *vertex);
-int graph_remove_vertex(graph_t *graph, vertex_t *vertex);
+vertex_t *graph_remove_vertex(graph_t *graph, vertex_t *vertex);
 int graph_insert_edge(graph_t *graph, edge_t *edge);
 int graph_remove_edge(graph_t *graph, edge_t *edge);
 void graph_undirect(graph_t *graph);
@@ -79,6 +79,8 @@ graph_t *graph_tree_reduce(graph_t *graph);
 
 /* Loads a graph from a file containing an adjacency matrix */
 graph_t *graph_from_file_M(char *filename);
+
+void graph_triangulate(graph_t *graph);
 
 /* Generates a graph in the form of a triangulated grid */
 graph_t *graph_generate(int x, int y, int max);

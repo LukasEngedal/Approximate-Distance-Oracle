@@ -14,10 +14,10 @@
 #define PRINT_LCA 0
 #define PRINT_SP_TREE 0
 #define PRINT_PATH 0
-#define PRINT_PST 0
+#define PRINT_PST 1
 #define PRINT_RECUR2 0
 #define PRINT_QUERY 0
-#define PRINT_MAIN 1
+#define PRINT_MAIN 0
 
 void test_graph(graph_t *graph) {
     int expected, actual;
@@ -33,6 +33,15 @@ void test_graph(graph_t *graph) {
             continue;
         n_v++;
 
+        /* Testing ID */
+        expected = i;
+        actual = v->id;
+        if (actual != expected) {
+            printf("Vertex in graph has wrong id. Expected: %d, Actual: %d\n", expected, actual);
+            exit(EXIT_FAILURE);
+        }
+
+        /* Testing for 0 edges */
         first = v->edge;
         nc = 0;
         ncc = 0;
@@ -61,16 +70,28 @@ void test_graph(graph_t *graph) {
         }
 
         if (nc != ncc) {
-        printf("Number of edges from vertex in c direction and cc direction differ. nc: %d, ncc: %d\n", nc, ncc);
-        exit(EXIT_FAILURE);
+            printf("Number of edges from vertex in c direction and cc direction differ. nc: %d, ncc: %d\n", nc, ncc);
+            exit(EXIT_FAILURE);
         }
         if (nc != v->n) {
-        printf("Number of edges from vertex differs from n. Expected: %d, Actual: %d\n", v->n, nc);
-        exit(EXIT_FAILURE);
+            printf("Number of edges from vertex differs from n. Expected: %d, Actual: %d\n", v->n, nc);
+            exit(EXIT_FAILURE);
         }
 
         e = v->edge;
-        for (int i = 0; i < nc; i++) {
+        for (int j = 0; j < nc; j++) {
+            if (e->w < 0) {
+                printf("Edge has negative weigth: %d.\n", e->w);
+                exit(EXIT_FAILURE);
+            }
+
+            expected = i;
+            actual = e->source->id;
+            if (actual != expected) {
+                printf("Edge source id is incorrect. Expected: %d, Actual: %d\n", expected, actual);
+                exit(EXIT_FAILURE);
+            }
+
             if (e->undirect == NULL) {
                 printf("Edge does not have a undirect partner.\n");
                 exit(EXIT_FAILURE);
@@ -107,6 +128,10 @@ void test_graph(graph_t *graph) {
         if (e == NULL)
             continue;
 
+        if (e->w < 0) {
+            printf("Edge has weight %d\n", e->w);
+        }
+
         n_e++;
     }
 
@@ -115,6 +140,41 @@ void test_graph(graph_t *graph) {
     if (actual != expected) {
         printf("Number of actual edges in the graph differs from number in E. Expected: %d, Actual: %d\n", expected, actual);
         exit(EXIT_FAILURE);
+    }
+}
+
+void test_triangle(graph_t *graph) {
+    edge_t *e1, *e2, *e3, *e4;
+    for (int i = 0; i < graph->cap_e; i++) {
+        e1 = graph->E[i];
+        if (e1 == NULL)
+            continue;
+
+        e2 = e1->undirect->cc;
+        e3 = e2->undirect->cc;
+        e4 = e3->undirect->cc;
+
+        if (e1 != e4) {
+            printf("Edges in graphs does not form a triangle in the cc direction!\n");
+            printf("e1->s->id: %d, e1->t->id: %d\n", e1->source->id, e1->target->id);
+            printf("e2->s->id: %d, e2->t->id: %d\n", e2->source->id, e2->target->id);
+            printf("e3->s->id: %d, e3->t->id: %d\n", e3->source->id, e3->target->id);
+            printf("e4->s->id: %d, e4->t->id: %d\n", e4->source->id, e4->target->id);
+            exit(EXIT_FAILURE);
+        }
+
+        e2 = e1->undirect->c;
+        e3 = e2->undirect->c;
+        e4 = e3->undirect->c;
+
+        if (e1 != e4) {
+            printf("Edges in graphs does not form a triangle in the c direction!\n");
+            printf("e1->s->id: %d, e1->t->id: %d\n", e1->source->id, e1->target->id);
+            printf("e2->s->id: %d, e2->t->id: %d\n", e2->source->id, e2->target->id);
+            printf("e3->s->id: %d, e3->t->id: %d\n", e3->source->id, e3->target->id);
+            printf("e4->s->id: %d, e4->t->id: %d\n", e4->source->id, e4->target->id);
+            exit(EXIT_FAILURE);
+        }
     }
 }
 
@@ -223,7 +283,7 @@ int main() {
     printf("Testing Graph Generator.\n");
     int x = 20;
     int y = 20;
-    int max = 9;
+    int max = 2;
     graph_t *gen_graph = graph_generate(x, y, max);
 
     if (PRINT_GRAPH_GEN || PRINT_ALL) {
@@ -231,6 +291,7 @@ int main() {
     }
 
     test_graph(gen_graph);
+    test_triangle(gen_graph);
 
     expected = x * y;
     actual = gen_graph->n_v;
@@ -252,16 +313,6 @@ int main() {
                 graph_destroy(graphh);
             }
         }
-    }
-
-    edge_t *e1, *e2, *e3, *e4;
-    e1 = gen_graph->V[gen_graph->n_v >> 1]->edge;
-    e2 = e1->undirect->cc;
-    e3 = e2->undirect->cc;
-    e4 = e3->undirect->cc;
-    if (e1 != e4 ) {
-        printf("Edges does not form a triangle.\n");
-        exit(EXIT_FAILURE);
     }
 
 
@@ -291,6 +342,110 @@ int main() {
         graph_print(graph);
         printf("\n");
     }
+
+
+    /*
+     * Testing graph copying
+     */
+    printf("Testing Graph Copying.\n");
+    graph_t *g_copy = graph_copy(gen_graph);
+
+    test_graph(g_copy);
+    test_triangle(g_copy);
+
+    expected = gen_graph->n_v;
+    actual = g_copy->n_v;
+    if (actual != expected) {
+        printf("Number of vertices in the graph g_copy is incorrect. Expected %d, got %d\n", expected, actual);
+        exit(EXIT_FAILURE);
+    }
+    expected = gen_graph->n_e;
+    actual = g_copy->n_e;
+    if (actual != expected) {
+        printf("Number of edges in the graph g_copy is incorrect. Expected %d, got %d\n", expected, actual);
+        exit(EXIT_FAILURE);
+    }
+
+    vertex_t *vc;
+    edge_t *ec;
+    for (int i = 0; i < gen_graph->cap_v; i++) {
+        v = gen_graph->V[i];
+        vc = g_copy->V[i];
+        if (v == NULL) {
+            if (vc == NULL) {
+                continue;
+            } else {
+                printf("Graph g_copy differs from original graph! (original vertex null, g_copy not)\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+        if (vc == NULL) {
+            printf("Graph g_copy differs from original graph! (original vertex not null, g_copy null) \n");
+            exit(EXIT_FAILURE);
+        }
+        expected = v->id;
+        actual = vc->id;
+        if (actual != expected) {
+            printf("Graph copy: vertex id's does not match. Expected: %d, Actual: %d\n", expected, actual);
+            exit(EXIT_FAILURE);
+        }
+        expected = v->n;
+        actual = vc->n;
+        if (actual != expected) {
+            printf("Graph copy: vertex number of edges does not match. Expected: %d, Actual: %d\n", expected, actual);
+            exit(EXIT_FAILURE);
+        }
+
+        e = v->edge;
+        ec = vc->edge;
+        for (int j = 0; j < v->n; j++) {
+            if (e == NULL) {
+                if (ec == NULL) {
+                    continue;
+                } else {
+                    printf("Graph g_copy differs from original graph! (original edge null, g_copy not)\n");
+                    exit(EXIT_FAILURE);
+                }
+            }
+            if (ec == NULL) {
+                printf("Graph g_copy differs from original graph! (original edge not null, g_copy null) \n");
+                exit(EXIT_FAILURE);
+            }
+
+            expected = e->source->id;
+            actual = ec->source->id;
+            if (actual != expected) {
+                printf("Graph copy: edge source ID differs from copy. Expected: %d, Actual: %d\n", expected, actual);
+                exit(EXIT_FAILURE);
+            }
+            expected = e->target->id;
+            actual = ec->target->id;
+            if (actual != expected) {
+                printf("Graph copy: edge target ID differs from copy. Expected: %d, Actual: %d\n", expected, actual);
+                exit(EXIT_FAILURE);
+            }
+
+            expected = e->undirect->source->id;
+            actual = ec->undirect->source->id;
+            if (actual != expected) {
+                printf("Graph copy: undirect edge source ID differs from copy. Expected: %d, Actual: %d\n", expected, actual);
+                exit(EXIT_FAILURE);
+            }
+            expected = e->undirect->target->id;
+            actual = ec->undirect->target->id;
+            if (actual != expected) {
+                printf("Graph copy: undirect edge target ID differs from copy. Expected: %d, Actual: %d\n", expected, actual);
+                exit(EXIT_FAILURE);
+            }
+
+            e = e->c;
+            ec = ec->c;
+        }
+    }
+
+    graph_destroy(g_copy);
+    test_graph(gen_graph);
+    test_triangle(gen_graph);
 
 
     /*
@@ -364,90 +519,6 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-
-    /*
-     * Testing graph copying
-     */
-    printf("Testing Graph Copying.\n");
-    graph_t *g_copy = graph_copy(graph);
-
-    test_graph(g_copy);
-
-    expected = graph->n_v;
-    actual = g_copy->n_v;
-    if (actual != expected) {
-        printf("Number of vertices in the graph g_copy is incorrect. Expected %d, got %d\n", expected, actual);
-        exit(EXIT_FAILURE);
-    }
-    expected = graph->n_e;
-    actual = g_copy->n_e;
-    if (actual != expected) {
-        printf("Number of edges in the graph g_copy is incorrect. Expected %d, got %d\n", expected, actual);
-        exit(EXIT_FAILURE);
-    }
-
-    vertex_t *vc;
-    for (int i = 0; i < graph->cap_v; i++) {
-        v = graph->V[i];
-        vc = g_copy->V[i];
-        if (v == NULL) {
-            if (vc == NULL) {
-                continue;
-            } else {
-                printf("Graph g_copy differs from original graph! (original vertex null, g_copy not)\n");
-                exit(EXIT_FAILURE);
-            }
-        }
-        if (vc == NULL) {
-            printf("Graph g_copy differs from original graph! (original vertex not null, g_copy null) \n");
-            exit(EXIT_FAILURE);
-        }
-        if (v->id != vc->id) {
-            printf("Graph g_copy differs from original graph! (vertex id's does not match) \n");
-            exit(EXIT_FAILURE);
-        }
-        if (v->n != vc->n) {
-            printf("Graph g_copy differs from original graph! (vertex number of edges does not match) \n");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    edge_t *ec;
-    for (int i = 0; i < graph->cap_e; i++) {
-        e = graph->E[i];
-        ec = g_copy->E[i];
-        if (e == NULL) {
-            if (ec == NULL) {
-                continue;
-            } else {
-                printf("Graph g_copy differs from original graph! (original edge null, g_copy not)\n");
-                exit(EXIT_FAILURE);
-            }
-        }
-        if (ec == NULL) {
-            printf("Graph g_copy differs from original graph! (original edge not null, g_copy null) \n");
-            exit(EXIT_FAILURE);
-        }
-        if (e->source->id != ec->source->id || e->target->id != ec->target->id) {
-            printf("Graph g_copy differs from original graph! (edge sources or target ids does not match) \n");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    graph_destroy(g_copy);
-
-    expected = 13;
-    actual = graph->n_v;
-    if (actual != expected) {
-        printf("Number of vertices in the graph from file is incorrect after copying. Expected %d, got %d\n", expected, actual);
-        exit(EXIT_FAILURE);
-    }
-    expected = 40;
-    actual = graph->n_e;
-    if (actual != expected) {
-        printf("Number of edges in the graph from file is incorrect after copying. Expected %d, got %d\n", expected, actual);
-        exit(EXIT_FAILURE);
-    }
 
     /*
      * Testing Binary Heaps
@@ -610,7 +681,7 @@ int main() {
     printf("Testing Breath First Trees.\n");
     graph_t *tree_graph = graph_copy(gen_graph);
     test_graph(tree_graph);
-    tree_t *bf_tree = breath_first_tree(tree_graph, tree_graph->V[tree_graph->n_v / 2]);
+    tree_t *bf_tree = breath_first_tree(tree_graph, tree_graph->n_v / 2);
 
     expected = tree_graph->n_v;
     actual = bf_tree->size;
@@ -925,20 +996,52 @@ int main() {
 
     srand(time(NULL));
 
+    test_graph(gen_graph);
+    test_triangle(gen_graph);
+
     graph_t *pst_graph = graph_copy(gen_graph);
     test_graph(pst_graph);
+    test_triangle(pst_graph);
 
-    path_t **separators = pst2(pst_graph);
-    path_t *separator = separators[0];
-    printf("Size of path: %d\n", separator->n);
-    //for (i = 0; i < separator->n; i++) {
-    //    printf("ID: %d\n", separator->V[i]->id);
-    //}
+    path_t **separators = pst(pst_graph);
+    if (PRINT_PST || PRINT_ALL) {
+        for (i = 0; i < 3; i++) {
+            printf("Size of pst_path: %d\n", separators[i]->n);
+            //path_print(separators[i]);
+        }
+    }
+    for (i = 0; i < 3; i++) {
+        test_path(separators[i]);
+    }
 
-    test_path(separator);
-    //path_print(separator);
+    vertex_t *vs[x*y];
+    for (i = 0; i < x*y; i++) {
+        vs[i] = NULL;
+    }
+    path_t *separator;
+    for (i = 0; i < 3; i++) {
+        separator = separators[i];
 
-    graph_remove_path(pst_graph, separator);
+        for (j = 0; j < separator->n; j++) {
+            v = separator->V[j];
+            if (vs[v->id] == NULL) {
+                vs[v->id] = v;
+            }
+        }
+        path_destroy(separator);
+    }
+    for (i = 0; i < x*y; i++) {
+        v = vs[i];
+        if (v == NULL)
+            continue;
+
+        graph_remove_vertex(pst_graph, v);
+        vertex_destroy(v);
+    }
+    free(separators);
+
+    printf("Hertil?\n");
+
     test_graph(pst_graph);
 
     graph_t **pst_graphs = graph_components(pst_graph);
@@ -950,8 +1053,24 @@ int main() {
         printf("Number of graphs: %d\n", n_pst_graphs);
         for (i = 0; i < n_pst_graphs; i++) {
             printf("Size of graph %d: %d\n", i, pst_graphs[i]->n_v);
-            test_graph(pst_graphs[i]);
         }
+    }
+
+    graph_t *g;
+    for (i = 0; i < n_pst_graphs; i++) {
+        g = pst_graphs[i];
+        test_graph(g);
+
+        graph_triangulate(g);
+        test_graph(g);
+        test_triangle(g);
+    }
+
+    graph_destroy(pst_graphs[0]);
+    for (i = 1; i < n_pst_graphs; i++) {
+        g = pst_graphs[i];
+        test_graph(g);
+        test_triangle(g);
     }
 
     /*
@@ -1045,34 +1164,28 @@ int main() {
     /*
      * Testing the main algorithm
      */
-    printf("Testing the Main Algorithm\n");
-    graph_t *main_graph = graph_copy(gen_graph);
-    eps = 0.5;
-    preprocess_result_t *main_result = thorup_preprocess(main_graph, eps);
+    //int run_main = 1;
+    //if (run_main) {
+        printf("Testing the Main Algorithm\n");
+        graph_t *main_graph = graph_copy(gen_graph);
+        eps = 0.5;
+        preprocess_result_t *main_result = thorup_preprocess(main_graph, eps);
 
-    s = rand() % gen_graph->n_v;
-    printf("s: %d\n", s);
-    printf("n: %d\n", main_graph->n_v);
-    dijkstra_result_t *dijk_result_main = dijkstra_sssp(gen_graph, s);
+        s = rand() % gen_graph->n_v;
+        dijkstra_result_t *dijk_result_main = dijkstra_sssp(gen_graph, s);
 
-    int main_d, dijk_d, diff;
-    if (PRINT_MAIN || PRINT_ALL) {
-        for (i = 0; i < gen_graph->n_v; i++) {
-            main_d = thorup_query(main_result, s, i);
-            dijk_d = dijkstra_query(dijk_result_main, i);
-            diff = main_d - dijk_d;
-            printf("Oracle   distance from %3d to %3d: %3d\n", s, i, main_d);
-            printf("Dijkstra distance from %3d to %3d: %3d\n", s, i, dijk_d);
-            printf("Difference: %3d, t: %3f\n", diff, (float)diff / dijk_d);
+        int main_d, dijk_d, diff;
+        if (PRINT_MAIN || PRINT_ALL) {
+            for (i = 0; i < gen_graph->n_v; i++) {
+                main_d = thorup_query(main_result, s, i);
+                dijk_d = dijkstra_query(dijk_result_main, i);
+                diff = main_d - dijk_d;
+                printf("Oracle   distance from %3d to %3d: %3d\n", s, i, main_d);
+                printf("Dijkstra distance from %3d to %3d: %3d\n", s, i, dijk_d);
+                printf("Difference: %3d, t: %3f\n", diff, (float)diff / dijk_d);
+            }
         }
-    }
-
-    vertex_t *vertex = gen_graph->V[210];
-    e = vertex->edge;
-    for (i = 0; i < vertex->n; i++) {
-        printf("id: %d\n", e->target->id);
-        e = e->c;
-    }
+        //}
 
     printf("Succes!\n");
 
@@ -1080,15 +1193,15 @@ int main() {
     /*
      * Testing graph_remove_vertex
      */
-    if (0) {
-        int n = graph->cap_v;
-        vertex_t *vertex;
+    if (1) {
+        int n = gen_graph->cap_v;
         for (int i = 0; i < n; i++) {
-            vertex = graph->V[i];
-            if (vertex == NULL)
+            v = gen_graph->V[i];
+            if (v == NULL)
                 continue;
 
-            graph_remove_vertex(graph, vertex);
+            graph_remove_vertex(gen_graph, v);
+            vertex_destroy(v);
         }
     }
 
@@ -1139,12 +1252,7 @@ int main() {
     path_destroy(tpath);
 
     /* Separator Theorem */
-    free(separators);
-    for (i = 0; i < separator->n; i++) {
-        vertex_destroy(separator->V[i]);
-    }
-    path_destroy(separator);
-    for (i = 0; i < n_pst_graphs; i++) {
+    for (i = 1; i < n_pst_graphs; i++) {
         graph_destroy(pst_graphs[i]);
     }
     free(pst_graphs);
@@ -1161,6 +1269,7 @@ int main() {
     //graph_destroy(main_graph);
     preprocess_result_destroy(main_result);
     dijkstra_destroy(dijk_result_main);
+
 
     return 0;
 }

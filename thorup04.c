@@ -88,7 +88,7 @@ preprocess_result_t *preprocess_result_create(float eps, int n) {
 
     vertex_result_t *vertex_result;
     for (int i = 0; i < result->n_v; i++) {
-        vertex_result = vertex_result_create(logn);
+        vertex_result = vertex_result_create(logn*3);
         result->V[i] = vertex_result;
     }
     /* TODO: fix vertex_result == NULL */
@@ -142,177 +142,35 @@ int tree_cycle_weight(edge_t *edge, edge_t *edge3) {
     treenode_t *node_v = (treenode_t *)v->node;
     treenode_t *node_w = (treenode_t *)w->node;
 
+    /* If edge is a tree edge, inside = 0  per definition */
     if (node_v->parent == node_w || node_w->parent == node_v)
         return 0;
 
     path_t *path_v = tree_root_path(node_v);
     path_t *path_w = tree_root_path(node_w);
 
+    int n_v = path_v->n;
+    int n_w = path_w->n;
+
+    if (n_v == 0 || n_w == 0)
+        return 0;
+
     treenode_t *root_node = (treenode_t *)path_v->V[0]->node;
     int n = root_node->size;
 
-    /* We need to account for root paths sharing vertices */
-    int start = 0;
-    while (path_v->V[start+1] == path_w->V[start+1]) {
-        start++;
-    }
-
-    int end_v = path_v->n - 2;
-    int end_w = path_w->n - 2;
-
-    printf("start: %d, end_v: %d, end_w: %d\n", start, end_v, end_w);
-    if (end_v - start < 2 || end_w - start < 2)
-        return 0;
-
-    int inside = 0;
-
-    vertex_t *t;
-    edge_t *e, *c, *cc;
-    treenode_t *node_s, *node_t;
-
-    edge_t *prev = edge;
-    vertex_t *s = v;
-
-    /* We add the nodes from path_v */
-    for (int i = end_v; i >= start; i--) {
-        t = path_v->V[i];
-
-        /* We determine the path edge */
-        e = s->edge;
-        for (int j = 0; j < s->n; j++) {
-            if (e->target == t) {
-                break;
-            }
-            e = e->c;
-        }
-
-        /* We consider all the edges between e and prev */
-        node_s = (treenode_t *)s->node;
-        cc = e->cc;
-        while (cc != prev) {
-            node_t = (treenode_t *)cc->target->node;
-
-            /* It it is a tree edge, we add the correct size */
-            if (node_t->parent == node_s) {
-                inside += node_t->size;
-            } else if (node_s->parent == node_t) {
-                inside += n - node_s->size;
-            }
-
-            cc = cc->cc;
-        }
-
-        prev = e->undirect;
-        s = t;
-    }
-
-    /* We add the nodes from path_w */
-    s = w;
-    prev = edge->undirect;
-    for (int i = end_w; i >= start; i--) {
-        t = path_w->V[i];
-
-        e = s->edge;
-        for (int j = 0; j < s->n; j++) {
-            if (e->target == t) {
-                break;
-            }
-            e = e->c;
-        }
-
-        node_s = (treenode_t *)s->node;
-        c = e->c;
-        while (c != prev) {
-            node_t = (treenode_t *)c->target->node;
-
-            if (node_t->parent == node_s) {
-                inside += node_t->size;
-            } else if (node_s->parent == node_t) {
-                inside += n - node_s->size;
-            }
-
-            c = c->c;
-        }
-
-        prev = e->undirect;
-        s = t;
-    }
-
-    /* We add "root" edges */
-    s = path_v->V[start];
-    node_s = (treenode_t *)s->node;
-    c = s->edge;
-    while (c->target != path_v->V[start+1]) {
-        c = c->c;
-    }
-    e = s->edge;
-    while (e->target != path_w->V[start+1]) {
-        e = e->c;
-    }
-    while (c != e) {
-        node_t = (treenode_t *)cc->target->node;
-
-        if (node_t->parent == node_s) {
-            inside += node_t->size;
-        } else if (node_s->parent == node_t) {
-            inside += n - node_s->size;
-        }
-
-        c = c->c;
-    }
-
-    if (edge3) {
-        /* We determine whether the triangle is inside or outside */
-        e = v->edge;
-        while (e->target != path_v->V[end_v]) {
-            e = e->c;
-        }
-        while (1) {
-            if (e == edge)
-                break;
-            if (e == edge3->undirect) {
-                inside = n - inside - path_v->n - path_w->n + start + 1;
-                break;
-            }
-
-            e = e->cc;
-        }
-    }
-
-    path_destroy(path_v);
-    path_destroy(path_w);
-
-    return inside;
-}
-
-int tree_cycle_weight2(edge_t *edge) {
-    vertex_t *v = edge->source;
-    vertex_t *w = edge->target;
-
-    treenode_t *node_v = (treenode_t *)v->node;
-    treenode_t *node_w = (treenode_t *)w->node;
-
-    /* If edge is a root path, inside = 0  per definition */
-    if (node_v->parent == node_w || node_w->parent == node_v)
-        return 0;
-
-    path_t *path_v = tree_root_path(node_v);
-    path_t *path_w = tree_root_path(node_w);
-
-    treenode_t *root_node = (treenode_t *)path_v->V[0]->node;
-    int n = root_node->size;
+    vertex_t *saved = path_v->V[n_v-2];
 
     /* We need to account for root paths sharing vertices */
     int start = 0;
     while (path_v->V[start] == path_w->V[start]) {
         start++;
-        if (start == path_v->n || start == path_w->n)
+        if (start == n_v || start == n_w)
             break;
     }
     start -= 1;
 
     /* path_v and path_w needs to differ by at least one vertex */
-    if (path_v->n - start < 2 || path_w->n - start < 2) {
+    if (n_w - start < 2 || n_w - start < 2) {
         path_destroy(path_v);
         path_destroy(path_w);
         return 0;
@@ -378,8 +236,59 @@ int tree_cycle_weight2(edge_t *edge) {
         s = t;
     }
 
+    if (edge3) {
+        /* We determine whether the triangle is inside or outside */
+        e = v->edge;
+        while (e->target != saved) {
+            e = e->c;
+        }
+        while (1) {
+            if (e == edge)
+                break;
+            if (e == edge3->undirect) {
+                inside = n - inside - n_v - n_w + start + 1;
+                break;
+            }
+
+            e = e->cc;
+        }
+    }
+
     path_destroy(path);
     return inside;
+}
+
+path_t *tree_cycle_create(edge_t *e) {
+    /* We create the separator path, by removing shared vertices from path_w,
+     * flipping the result, extending it with v, and joining with path_v */
+    treenode_t *node_v = (treenode_t *)e->source->node;
+    treenode_t *node_w = (treenode_t *)e->target->node;
+    path_t *path_v = tree_root_path(node_v);
+    path_t *path_w = tree_root_path(node_w);
+
+    int shared = 1;
+    while (path_v->V[shared] == path_w->V[shared]) {
+        shared++;
+        if (shared == path_v->n-1 || shared == path_w->n-1)
+            break;
+    }
+    shared -= 1;
+
+    path_t *tmp = path_split(path_w, shared);
+    path_destroy(path_w);
+
+    path_expand(tmp, 1);
+    tmp->V[tmp->n-1] = e->source;
+    tmp->d[tmp->n-1] = tmp->d[tmp->n-2] + e->w;
+
+    path_t *tmpf = path_flip(tmp);
+    path_destroy(tmp);
+
+    path_t *path = path_join(path_v, tmpf);
+    path_destroy(path_v);
+    path_destroy(tmpf);
+
+    return path;
 }
 
 path_t **pst2(graph_t *graph) {
@@ -416,7 +325,7 @@ path_t **pst2(graph_t *graph) {
             if (e == NULL)
                 continue;
 
-            inside = tree_cycle_weight2(e);
+            inside = tree_cycle_weight(e, NULL);
 
             if (inside > lower_limit && inside < upper_limit)
                 found = 1;
@@ -425,124 +334,71 @@ path_t **pst2(graph_t *graph) {
     //printf("\nEdge found\n");
     //printf("Inside: %d\n", inside);
 
-    /* We create the separator path, by removing shared vertices from path_w,
-     * flipping the result, and adding it to path_v */
-    treenode_t *node_v = (treenode_t *)e->source->node;
-    treenode_t *node_w = (treenode_t *)e->target->node;
-    path_t *path_v = tree_root_path(node_v);
-    path_t *path_w = tree_root_path(node_w);
-    if (path_v == NULL || path_w == NULL) {
-        printf("pst2: paths is NULL!\n");
-    }
-
-    int shared = 1;
-    while (path_v->V[shared] == path_w->V[shared]) {
-        shared++;
-        if (shared == path_v->n || shared == path_w->n)
-            break;
-    }
-    path_t *tmp = path_split(path_w, shared);
-    path_destroy(path_w);
-
-    path_expand(tmp, 1);
-    tmp->V[tmp->n-1] = e->source;
-    tmp->d[tmp->n-1] = tmp->d[tmp->n-2] + e->w;
-
-    path_t *tmpf = path_flip(tmp);
-    path_destroy(tmp);
-
-    path_t *path = path_join(path_v, tmpf);
-    path_destroy(path_v);
-    path_destroy(tmpf);
-
     path_t **paths = malloc(sizeof(path_t *));
-    paths[0] = path;
+    paths[0] = tree_cycle_create(e);
 
     tree_destroy(sp_tree);
     return paths;
 }
 
 path_t **pst(graph_t *graph) {
+    /* We create a shortest path tree */
     int r = rand() % graph->n_v;
+    while(graph->V[r] == NULL)
+        r = rand() % graph->cap_v;
+    tree_t *bf_tree = breath_first_tree(graph, r);
 
-    /* We copy the given graph and create a shortest path tree */
-    graph_t *tree_graph = graph_copy(graph);
-    shortest_path_tree(tree_graph, r);
+    /* We look through our graph for a edge */
+    edge_t *e1, *e2, *e3, *max_e;
+    int i, inside1, inside2, inside3, max;
+    while (1) {
+        i = rand() % graph->cap_e;
+        e1 = graph->E[i];
+        if (e1 != NULL)
+            break;
+    }
+
+    while (1) {
+        //printf("pst\n");
+        /* We find the other two edges creating a triangle with e1 */
+        e2 = e1->undirect->cc;
+        e3 = e2->undirect->cc;
+
+        /* We check if it is a triangle */
+        if (e1 != e3->undirect->cc) {
+            printf("Why do we not have a triangle?\n");
+            exit(EXIT_FAILURE);
+        }
+
+        /* We determine the cost inside the fundamental cycles of the edges */
+        inside1 = tree_cycle_weight(e1, e3);
+        inside2 = tree_cycle_weight(e2, e1);
+        inside3 = tree_cycle_weight(e3, e2);
+        //printf("inside1: %d, inside2: %d, inside3: %d\n", inside1, inside2, inside3);
+
+        /* We determine the cost inside the cycle with the highest cost */
+        max = (inside1 > inside2 ? inside1 : inside2);
+        max_e = (inside1 > inside2 ? e1 : e2);
+        max = (max > inside3 ? max : inside3);
+        max_e = (max > inside3 ? max_e : e3);
+
+        if (max > (graph->n_v >> 1)) {
+            e1 = max_e->undirect;
+        } else {
+            break;
+        }
+    }
 
     /* We set up the array for the three paths */
     path_t **separators = malloc(sizeof(path_t *) * 3);
     if (separators == NULL)
         return NULL;
 
-    /* We look through our graph for an edge */
-    edge_t *e1, *e2, *e3;
-    treenode_t *node_v, *node_w;
-    path_t *path_v, *path_w;
-    int i, inside1, inside2, inside3, max12, max23, max;
-    edge_t *next, *old;
-    while (1) {
-        printf("While1\n");
-        i = rand() % tree_graph->cap_e;
-        e1 = tree_graph->E[i];
-        if (e1 == NULL)
-            continue;
+    separators[0] = tree_cycle_create(e1);
+    separators[1] = tree_cycle_create(e2);
+    separators[2] = tree_cycle_create(e3);
 
-        while (1) {
-            printf("While2\n");
-            /* We find the other two edges creating a triangle with e1 */
-            e2 = e1->undirect->cc;
-            e3 = e2->undirect->cc;
-
-            /* We check if it is a triangle */
-            if (e1 != e3->undirect->cc) {
-                break;
-            }
-
-            /* We determine the cost inside the fundamental cycles of the edges */
-            inside1 = tree_cycle_weight(e1, e3);
-            inside2 = tree_cycle_weight(e2, e1);
-            inside3 = tree_cycle_weight(e3, e2);
-            printf("inside1: %d, inside2: %d, inside3: %d\n", inside1, inside2, inside3);
-
-            /* We determine the cost inside the one with the highest cost */
-            max12 = (inside1 > inside2 ? inside1 : inside2);
-            max23 = (inside2 > inside3 ? inside2 : inside3);
-            max = (max12 > max23 ? max12 : max23);
-
-            if (max == 0) {
-                break;
-            }
-
-            /* If the cost is more than n/2, we try again. */
-            if (max > graph->n_v >> 1) {
-                if (max == inside1) {
-                    next = e1->undirect;
-                }
-                if (max == inside2) {
-                    next = e2->undirect;
-                }
-                if (max == inside3) {
-                    next = e3->undirect;
-                }
-
-                if (next == old) {
-                    printf("New == old\n");
-                    break;
-                }
-
-                old = e1;
-                e1 = next;
-                continue;
-            }
-        }
-    }
-
-    node_v = (treenode_t *)e1->source->node;
-    node_w = (treenode_t *)e1->target->node;
-    path_v = tree_root_path(node_v);
-    path_w = tree_root_path(node_w);
-    separators[0] = path_join(path_v, path_w);
-
+    tree_destroy(bf_tree);
     return separators;
 }
 
@@ -589,7 +445,6 @@ void recursion2_helper(graph_t *graph, path_t *path, preprocess_result_t *result
     covering_set_t *cset;
     int v_a, v_b, v_c;
     int eps = result->eps;
-    int ret;
     for (int i = 0; i < graph->cap_v; i++) {
         vertex = graph->V[i];
         if (vertex == NULL)
@@ -613,18 +468,14 @@ void recursion2_helper(graph_t *graph, path_t *path, preprocess_result_t *result
         if (v_a >= (1 - eps) * v_b + a_b ||
             v_b >= (1 - eps) * v_a + a_b) {
             v1 = h1->V[vid];
-            ret = graph_remove_vertex(h1, v1);
-            if (ret)
-                printf("Graph_remove_vertex error");
+            graph_remove_vertex(h1, v1);
             vertex_destroy(v1);
         }
         /* We check if either v_b or v_c epsilon-covers the other */
         if (v_c >= (1 - eps) * v_b + b_c ||
             v_b >= (1 - eps) * v_c + b_c) {
             v2 = h2->V[vid];
-            ret = graph_remove_vertex(h2, v2);
-            if (ret)
-                printf("Graph_remove_vertex error");
+            graph_remove_vertex(h2, v2);
             vertex_destroy(v2);
         }
     }
@@ -638,7 +489,7 @@ void recursion2_helper(graph_t *graph, path_t *path, preprocess_result_t *result
 
 /* Recursion on a graph H and a path Q */
 void recursion2(graph_t *graph, path_t *path, preprocess_result_t *result) {
-    //printf("Recursion 2, graph->n_v: %d, path->n: %d\n", graph->n_v, path->n);
+    printf("Recursion 2, graph->n_v: %d, path->n: %d\n", graph->n_v, path->n);
     vertex_t *vertex;
     if (path->n <= 2 || graph->n_v - path->n < 2) {
         for (int i = 0; i < graph->cap_v; i++) {
@@ -690,7 +541,7 @@ void recursion2(graph_t *graph, path_t *path, preprocess_result_t *result) {
 }
 
 void recursion1(graph_t *graph, preprocess_result_t *result, treenode_t *curr_call) {
-    //printf("Recursion 1, graph->n_v: %d\n", graph->n_v);
+    printf("Recursion 1, graph->n_v: %d\n", graph->n_v);
     //test_graph(graph);
 
     vertex_t *vertex;
@@ -701,16 +552,17 @@ void recursion1(graph_t *graph, preprocess_result_t *result, treenode_t *curr_ca
                 continue;
 
             result->V[vertex->id]->final_call = curr_call;
-            graph_remove_vertex(graph, vertex);
-            vertex_destroy(vertex);
         }
         graph_destroy(graph);
         return;
     }
 
     /* We determine the three separator paths using the planar separator theorem */
-    path_t **separators = pst2(graph);
-    int n_p = 1;
+    graph_t *pst_graph = graph_copy(graph);
+    graph_triangulate(pst_graph);
+    test_triangle(pst_graph);
+    path_t **separators = pst(pst_graph);
+    int n_p = 3; /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! HER !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
     if (separators == NULL)
         return;
 
@@ -723,41 +575,48 @@ void recursion1(graph_t *graph, preprocess_result_t *result, treenode_t *curr_ca
         recursion2(h, path, result);
     }
 
-    /* We remove the separator paths from the graph, and update the separator
+    /* We remove the separator paths from the graph, and remove the separator
      * vertices */
+    graph_t *graph_next = graph_copy(graph);
+    vertex_t *v;
     for (int i = 0; i < n_p; i++) {
         path = separators[i];
-        graph_remove_path(graph, path);
 
         for (int j = 0; j < path->n; j++) {
             vertex = path->V[j];
             result->V[vertex->id]->final_call = curr_call;
-            vertex_destroy(vertex);
+            v = graph_remove_vertex(graph_next, graph_next->V[vertex->id]);
+            vertex_destroy(v);
         }
         path_destroy(path);
     }
     free(separators);
+    graph_destroy(graph);
+    graph_destroy(pst_graph);
 
     /* We split the graph up into its connected components, and recurse on these */
-    graph_t **graphs = graph_components(graph);
+    graph_t **graphs = graph_components(graph_next);
 
     int n_g = 0;
-    graph_t *g = graphs[0];
+    while (graphs[n_g] != NULL) {
+        n_g++;
+    }
+
+    graph_t *g;
     treenode_t *recurs_call;
-    while (g != NULL) {
+    for (int i = 0; i < n_g; i++) {
+        g = graphs[i];
+
         recurs_call = treenode_create(curr_call->value + n_p);
         tree_insert_treenode(result->recursion_tree, curr_call, recurs_call);
         recursion1(g, result, recurs_call);
-
-        n_g++;
-        g = graphs[n_g];
     }
     free(graphs);
 }
 
 preprocess_result_t *thorup_preprocess(graph_t *graph, float eps) {
     preprocess_result_t *result = preprocess_result_create(eps, graph->n_v);
-    int n_p = 1;
+    int n_p = 3; /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! HER !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
     treenode_t *root = treenode_create(n_p);
     tree_t *tree = tree_create(root);

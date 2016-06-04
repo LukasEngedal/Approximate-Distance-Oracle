@@ -112,9 +112,10 @@ void tree_set_sizes(tree_t *tree) {
     tree_size_helper(tree->root);
 }
 
-tree_t *breath_first_tree(graph_t *graph, vertex_t *vertex) {
+tree_t *breath_first_tree(graph_t *graph, int id) {
     graph_reset_nodes(graph);
 
+    vertex_t *vertex = graph->V[id];
     treenode_t *root = treenode_create(0);
     root->owner = (void *)vertex;
     vertex->node = (void *)root;
