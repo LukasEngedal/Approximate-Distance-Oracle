@@ -1,6 +1,9 @@
 #ifndef TESTS_H
 #define TEST_H
 
+#include "graph.h"
+#include "tree.h"
+
 void test_graph(graph_t *graph);
 void test_triangle(graph_t *graph);
 void test_tree(tree_t *tree);

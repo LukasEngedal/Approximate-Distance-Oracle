@@ -1,6 +1,6 @@
 #include <time.h>
 #include "thorup04.h"
-#include "tests.h"
+#include "test_funcs.h"
 
 covering_set_t *covering_set_create(int n, int pid) {
     covering_set_t *c = malloc(sizeof(covering_set_t));
@@ -152,8 +152,11 @@ int tree_cycle_weight(edge_t *edge, edge_t *edge3) {
     int n_v = path_v->n;
     int n_w = path_w->n;
 
-    if (n_v == 0 || n_w == 0)
+    if (n_v < 2 || n_w < 2)
         return 0;
+
+    if (n_v < 2)
+        printf("Her\n");
 
     treenode_t *root_node = (treenode_t *)path_v->V[0]->node;
     int n = root_node->size;
@@ -163,6 +166,7 @@ int tree_cycle_weight(edge_t *edge, edge_t *edge3) {
     /* We need to account for root paths sharing vertices */
     int start = 0;
     while (path_v->V[start] == path_w->V[start]) {
+        //printf("While 1\n");
         start++;
         if (start == n_v || start == n_w)
             break;
@@ -220,6 +224,7 @@ int tree_cycle_weight(edge_t *edge, edge_t *edge3) {
         node_s = (treenode_t *)s->node;
         cc = e->cc;
         while (cc != prev) {
+            //printf("While 2\n");
             node_t = (treenode_t *)cc->target->node;
 
             /* It it is a tree edge, we add the correct size */
@@ -240,9 +245,11 @@ int tree_cycle_weight(edge_t *edge, edge_t *edge3) {
         /* We determine whether the triangle is inside or outside */
         e = v->edge;
         while (e->target != saved) {
+            //printf("While 3\n");
             e = e->c;
         }
         while (1) {
+            //printf("While 4\n");
             if (e == edge)
                 break;
             if (e == edge3->undirect) {
@@ -291,62 +298,12 @@ path_t *tree_cycle_create(edge_t *e) {
     return path;
 }
 
-path_t **pst2(graph_t *graph) {
-    float upper_limit = 0.60 * graph->n_v;
-    float lower_limit = 0.40 * graph->n_v;
-
-    int r, tries, i, inside;
-    edge_t *e;
-    tree_t *sp_tree;
-    int found = 0;
-    while (!found) {
-        /* We create a shortest path tree */
-        r = rand() % graph->cap_v;
-        while(graph->V[r] == NULL)
-            r = rand() % graph->cap_v;
-        sp_tree = shortest_path_tree(graph, r);
-        //printf("Tree root ID: %d\n", r);
-
-        /* We look for an edge, if none if found in E*5 tries, we try another tree */
-        tries = 0;
-        while (!found) {
-            if (tries >= graph->n_e * 5) {
-                //printf("\n");
-                upper_limit += 0.05 * graph->n_v;
-                lower_limit -= 0.05 * graph->n_v;
-                tree_destroy(sp_tree);
-                break;
-            }
-
-            //printf("\rLooking for edge");
-            tries++;
-            i = rand() % graph->cap_e;
-            e = graph->E[i];
-            if (e == NULL)
-                continue;
-
-            inside = tree_cycle_weight(e, NULL);
-
-            if (inside > lower_limit && inside < upper_limit)
-                found = 1;
-        }
-    }
-    //printf("\nEdge found\n");
-    //printf("Inside: %d\n", inside);
-
-    path_t **paths = malloc(sizeof(path_t *));
-    paths[0] = tree_cycle_create(e);
-
-    tree_destroy(sp_tree);
-    return paths;
-}
-
 path_t **pst(graph_t *graph) {
     /* We create a shortest path tree */
     int r = rand() % graph->n_v;
     while(graph->V[r] == NULL)
         r = rand() % graph->cap_v;
-    tree_t *bf_tree = breath_first_tree(graph, r);
+    tree_t *tree = shortest_path_tree(graph, r);//breath_first_tree(graph, r);
 
     /* We look through our graph for a edge */
     edge_t *e1, *e2, *e3, *max_e;
@@ -358,8 +315,17 @@ path_t **pst(graph_t *graph) {
             break;
     }
 
+    int attempts = 0;
+    float limit = 0.5 * graph->n_v;
     while (1) {
-        //printf("pst\n");
+        attempts++;
+        //printf("pst attempt %d\n", attempts);
+        if (attempts > graph->n_e) {
+            //printf("Couldn't find a triangle, increasing limit.\n");
+            limit += 0.1 * graph->n_v;
+            attempts = 0;
+        }
+
         /* We find the other two edges creating a triangle with e1 */
         e2 = e1->undirect->cc;
         e3 = e2->undirect->cc;
@@ -382,7 +348,7 @@ path_t **pst(graph_t *graph) {
         max = (max > inside3 ? max : inside3);
         max_e = (max > inside3 ? max_e : e3);
 
-        if (max > (graph->n_v >> 1)) {
+        if (max > limit) {
             e1 = max_e->undirect;
         } else {
             break;
@@ -394,11 +360,11 @@ path_t **pst(graph_t *graph) {
     if (separators == NULL)
         return NULL;
 
-    separators[0] = tree_cycle_create(e1);
-    separators[1] = tree_cycle_create(e2);
-    separators[2] = tree_cycle_create(e3);
+    separators[0] = tree_root_path((treenode_t *)e1->source->node);//tree_cycle_create(e1);
+    separators[1] = tree_root_path((treenode_t *)e2->source->node);//tree_cycle_create(e2);
+    separators[2] = tree_root_path((treenode_t *)e3->source->node);//tree_cycle_create(e3);
 
-    tree_destroy(bf_tree);
+    tree_destroy(tree);
     return separators;
 }
 
@@ -489,7 +455,7 @@ void recursion2_helper(graph_t *graph, path_t *path, preprocess_result_t *result
 
 /* Recursion on a graph H and a path Q */
 void recursion2(graph_t *graph, path_t *path, preprocess_result_t *result) {
-    printf("Recursion 2, graph->n_v: %d, path->n: %d\n", graph->n_v, path->n);
+    //printf("Recursion 2, graph->n_v: %d, path->n: %d\n", graph->n_v, path->n);
     vertex_t *vertex;
     if (path->n <= 2 || graph->n_v - path->n < 2) {
         for (int i = 0; i < graph->cap_v; i++) {
@@ -541,7 +507,7 @@ void recursion2(graph_t *graph, path_t *path, preprocess_result_t *result) {
 }
 
 void recursion1(graph_t *graph, preprocess_result_t *result, treenode_t *curr_call) {
-    printf("Recursion 1, graph->n_v: %d\n", graph->n_v);
+    //printf("Recursion 1, graph->n_v: %d\n", graph->n_v);
     //test_graph(graph);
 
     vertex_t *vertex;
@@ -563,8 +529,10 @@ void recursion1(graph_t *graph, preprocess_result_t *result, treenode_t *curr_ca
     test_triangle(pst_graph);
     path_t **separators = pst(pst_graph);
     int n_p = 3; /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! HER !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
-    if (separators == NULL)
+    if (separators == NULL) {
+        printf("Is separators ever NULL?\n");
         return;
+    }
 
     /* We do the distance recursion on the graph and each of the separator paths */
     graph_t *h;

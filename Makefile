@@ -1,15 +1,17 @@
 # Makefile
 #CC = gcc
-CFLAGS += -g -pedantic -std=c99 -Wall -Wextra -Werror
-LDFLAGS += -lm
-LDLIBS += -lm
+CFLAGS += -g -pedantic -std=gnu99 -Wall -Wextra -Werror
+LDFLAGS += -lm -lrt
+LDLIBS += -lm -lrt
 
 #SOURCES := $(wildcard *.c)
 #OBJECTS := $(SOURCES:.c=.o)
 #HEADERS := $(wildcard *.h)
-TARGETS := 	tests
+TARGETS := tests benchmark
 
 all: $(TARGETS)
+
+test: tests
 
 valgrind: tests.o
 	valgrind --leak-check=full --track-origins=yes ./tests
@@ -36,7 +38,11 @@ dijkstra.o: dijkstra.h fibheap.o bheap.o graph.o
 
 thorup04.o: graph.o tree.o dijkstra.o
 
-tests: tree.o dijkstra.o fibheap.o bheap.o graph.o thorup04.o queue.o
+test_funcs.o: test_funcs.h graph.o tree.o
+
+benchmark: graph.o thorup04.o tree.o dijkstra.o queue.o bheap.o fibheap.o test_funcs.o
+
+tests: tree.o dijkstra.o fibheap.o bheap.o graph.o thorup04.o queue.o test_funcs.o
 
 clean:
 	@- rm -f *.o
